@@ -1,0 +1,26 @@
+{
+  "name": "@pirell/bundlers",
+  "author": "Fairy",
+  "private": true,
+  "description": "Bundle compatibility tests for Pirell across vite, esbuild, rollup, and webpack.",
+  "license": "ISC",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build:vite": "echo \"TODO: vite build\"",
+    "build:esbuild": "echo \"TODO: esbuild build\"",
+    "build:rollup": "echo \"TODO: rollup build\"",
+    "build:webpack": "echo \"TODO: webpack build\"",
+    "build": "echo \"TODO: run all bundler builds\""
+  },
+  "dependencies": {
+    "pirell": "workspace:*"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "rollup": "^4.62.5",
+    "vite": "^8.2.2",
+    "webpack": "^5.109.2",
+    "webpack-cli": "^7.2.2"
+  }
+}

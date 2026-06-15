@@ -1,0 +1,15 @@
+{
+  "name": "@pirell/monorepo",
+  "author": "Fairy",
+  "private": true,
+  "description": "Monorepo for the Pirell library and showcase site.",
+  "license": "ISC",
+  "scripts": {
+    "build": "pnpm -F pirell build",
+    "test": "pnpm -F pirell test",
+    "typecheck": "pnpm -F pirell typecheck"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
