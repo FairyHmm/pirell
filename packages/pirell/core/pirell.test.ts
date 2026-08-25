@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { pirell } from "./pirell.js";
-import { pipe } from "./pipe.js";
+import { compose } from "./compose.js";
 import { Wrapper } from "./wrapper.js";
 import type { Pirell as PirellT } from "./types.js";
 
@@ -35,9 +35,9 @@ describe("pirell()", () => {
     expect(result.value).toBe(12); // (1+2+3)*2
   });
 
-  it.skip("composes as a plain step inside pipe(), mixed with a custom op", () => {
+  it.skip("composes as a plain step inside compose(), mixed with a custom op", () => {
     const doubled = (pirell() as any).extend({ double }).double();
-    const run = pipe(doubled, sumAll);
+    const run = compose(doubled, sumAll);
 
     const result = run({ shape: ["i"], value: [1, 2, 3] });
     expect(result.value).toBe(12);
