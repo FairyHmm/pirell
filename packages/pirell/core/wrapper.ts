@@ -1,4 +1,5 @@
 import type { Dim, Op, Pirell } from "./types.js";
+import { wireOps } from "./extend.js";
 
 export class Wrapper<S extends Dim[], T> {
   constructor(
@@ -13,16 +14,13 @@ export class Wrapper<S extends Dim[], T> {
   extend<Ops extends Record<string, Op<any, any, any, any, any>>>(
     ops: Ops,
   ): this & { [K in keyof Ops]: (...args: any[]) => any } {
-    for (const name of Object.keys(ops)) {
-      const op = ops[name]!;
-      (this as any)[name] = (...args: any[]) => {
-        const result = op(
-          { shape: this.shape, value: this.value } as Pirell<any, any>,
-          ...args,
-        );
-        return new Wrapper(result.shape, result.value);
-      };
-    }
+    wireOps(this, ops, (op, args) => {
+      const result = op(
+        { shape: this.shape, value: this.value } as Pirell<any, any>,
+        ...args,
+      );
+      return new Wrapper(result.shape, result.value);
+    });
     return this as any;
   }
 }
