@@ -1,16 +1,12 @@
 import { Wrapper } from "./wrapper.js";
-import { wireOps } from "./extend.js";
-import type { Dim, Op, Pirell } from "./types.js";
+import type { Dim, Pirell } from "./types.js";
 
 // Pirell -> Pirell, same as Op, so it composes with pipe() and other
-// ops interchangeably; extend() appends a step without running it.
+// ops interchangeably. Bare callable — no .extend(), no .pipe(). The
+// assembly layer (core/index.ts) attaches those onto the returned
+// surface via wireOps.
 export interface Deferred<In extends Dim[], Out extends Dim[], T, R> {
   (data: Pirell<In, T>): Pirell<Out, R>;
-  extend<Ops extends Record<string, Op<any, any, any, any, any>>>(
-    ops: Ops,
-  ): Deferred<In, Out, T, R> & {
-    [K in keyof Ops]: (...args: any[]) => Deferred<any, any, any, any>;
-  };
 }
 
 type Step = (data: Pirell<any, any>) => Pirell<any, any>;
@@ -24,19 +20,8 @@ function runSteps(steps: Step[], data: Pirell<any, any>): Pirell<any, any> {
 function makeDeferred<In extends Dim[], Out extends Dim[], T, R>(
   steps: Step[],
 ): Deferred<In, Out, T, R> {
-  const run = ((data: Pirell<In, T>) =>
+  return ((data: Pirell<In, T>) =>
     runSteps(steps, data)) as unknown as Deferred<In, Out, T, R>;
-
-  (run as any).extend = function <
-    Ops extends Record<string, Op<any, any, any, any, any>>,
-  >(ops: Ops) {
-    wireOps(run, ops, (op, args) =>
-      makeDeferred([...steps, (data: Pirell<any, any>) => op(data, ...args)]),
-    );
-    return run as any;
-  };
-
-  return run;
 }
 
 export function pirell<T>(data: T[]): Wrapper<["i"], T[]>;
