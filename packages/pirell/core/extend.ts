@@ -1,9 +1,6 @@
 import type { Op } from "./types.js";
 
-// Shared wiring mechanism behind every .extend(ops): for each entry,
-// attach a bound method to `target` that calls `apply(op, args)` and
-// returns whatever `apply` produces. Wrapper and Deferred each supply
-// their own `apply` (run now vs. defer), but the wiring loop is common.
+// Loop over ops and attach each as a bound method on target, using the caller-supplied apply strategy
 export function wireOps<
   Ops extends Record<string, Op<any, any, any, any, any>>,
   R,
@@ -18,11 +15,11 @@ export function wireOps<
   }
 }
 
-// Standalone form of .extend(), for use as a pipe() step: applies
-// extend(ops) to whatever surface (Wrapper or Deferred) it receives.
+// Pipe-compatible wrapper: delegates to surface.extend(ops), which the assembly layer wired
 export function extend<Ops extends Record<string, Op<any, any, any, any, any>>>(
   ops: Ops,
 ) {
-  return <S extends { extend: (ops: Ops) => any }>(surface: S) =>
-    surface.extend(ops);
+  return <S extends { extend: (ops: Ops) => any }>(
+    surface: S,
+  ): ReturnType<S["extend"]> => surface.extend(ops);
 }

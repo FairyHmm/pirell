@@ -1,10 +1,7 @@
 import { Wrapper } from "./wrapper.js";
 import type { Dim, Pirell } from "./types.js";
 
-// Pirell -> Pirell, same as Op, so it composes with pipe() and other
-// ops interchangeably. Bare callable — no .extend(), no .pipe(). The
-// assembly layer (core/index.ts) attaches those onto the returned
-// surface via wireOps.
+// Bare identity callable — no .extend(), no .pipe(). Assembly layer adds those.
 export interface Deferred<In extends Dim[], Out extends Dim[], T, R> {
   (data: Pirell<In, T>): Pirell<Out, R>;
 }
