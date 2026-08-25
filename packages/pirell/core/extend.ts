@@ -1,4 +1,4 @@
-import { Wrapper } from "./wrapper.js";
+import { Wrapper } from "./pirell.js";
 import type { Op, Pirell } from "./types.js";
 
 // Loop over ops and attach each as a bound method on target, using the caller-supplied apply strategy

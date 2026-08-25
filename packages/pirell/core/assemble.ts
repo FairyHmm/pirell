@@ -1,5 +1,5 @@
-import { Wrapper } from "./wrapper.js";
-import { pirell as rawPirell, type Deferred } from "./pirell.js";
+import { Wrapper, pirell as rawPirell } from "./pirell.js";
+import type { Deferred } from "./types.js";
 import { wireOps } from "./extend.js";
 import { compose } from "./compose.js";
 import type { Dim, Op, Pirell } from "./types.js";

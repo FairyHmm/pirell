@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { pirell } from "./assemble.js";
 import { compose } from "./compose.js";
-import { Wrapper } from "./wrapper.js";
+import { Wrapper } from "./pirell.js";
 import type { Pirell as PirellT } from "./types.js";
 
 const double = (data: PirellT<any, number[]>) => ({

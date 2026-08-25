@@ -1,9 +1,11 @@
-import { Wrapper } from "./wrapper.js";
-import type { Dim, Pirell } from "./types.js";
+import type { Deferred, Dim, Pirell } from "./types.js";
 
-// Bare identity callable — no .extend(), no .pipe(). Assembly layer adds those.
-export interface Deferred<In extends Dim[], Out extends Dim[], T, R> {
-  (data: Pirell<In, T>): Pirell<Out, R>;
+// Bare data-bound surface: shape + value only. No methods
+export class Wrapper<S extends Dim[], T> {
+  constructor(
+    public readonly shape: S,
+    public readonly value: T,
+  ) {}
 }
 
 type Step = (data: Pirell<any, any>) => Pirell<any, any>;

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { pirell } from "./pirell.js";
-import { Wrapper } from "./wrapper.js";
+import { Wrapper } from "./pirell.js";
 
 describe("pirell()", () => {
   it("with data returns a data-bound Wrapper", () => {

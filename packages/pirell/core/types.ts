@@ -18,11 +18,14 @@ export type Fluent<F extends Op<any, any, any, any, any>> =
     ? (this: Wrapper<In, T>, ...args: Args) => Wrapper<Out, R>
     : never;
 
-// Interface, not the class import, to avoid a circular dependency with
-// core/wrapper.ts (implementation lands in Phase 2).
+// Forward declaration to avoid circular dependency with pirell.ts.
 export interface Wrapper<S extends Dim[], T> {
   shape: S;
   value: T;
+}
+
+export interface Deferred<In extends Dim[], Out extends Dim[], T, R> {
+  (data: Pirell<In, T>): Pirell<Out, R>;
 }
 
 export type Entries<T> = { [K in keyof T]: [K, T[K]] }[keyof T];
