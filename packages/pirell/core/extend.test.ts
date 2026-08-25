@@ -2,12 +2,7 @@ import { describe, it, expect } from "vitest";
 import { pirell } from "./assemble.js";
 import { extend } from "./extend.js";
 import { pipe } from "./compose.js";
-import type { Pirell as PirellT } from "./types.js";
-
-const double = (data: PirellT<any, number[]>) => ({
-  shape: data.shape,
-  value: data.value.map((n: number) => n * 2),
-});
+import { double } from "./test-utils.js";
 
 describe("standalone extend()", () => {
   it("applied directly, mirrors the .extend() method", () => {

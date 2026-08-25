@@ -1,8 +1,7 @@
 import { Wrapper, pirell as rawPirell } from "./pirell.js";
-import type { Deferred } from "./types.js";
+import type { Deferred, Dim, Fluent, Op, Pirell } from "./types.js";
 import { wireOps } from "./extend.js";
 import { compose } from "./compose.js";
-import type { Dim, Op, Pirell } from "./types.js";
 
 // Assembly layer: the only place that composes the bare primitives
 // (Wrapper, Deferred, wireOps, compose) into the public pirell surface.
@@ -15,14 +14,14 @@ type Assembled<S> = S & {
   extend<Ops extends OpMap>(
     ops: Ops,
   ): Assembled<S> & {
-    [K in keyof Ops]: (...args: any[]) => any;
+    [K in keyof Ops]: Fluent<Ops[K] & Op<any, any, any, any, any>>;
   };
   pipe(...fns: Array<(x: any) => any>): any;
   compose(...fns: Array<(x: any) => any>): any;
 };
 
 // Wire .extend(), .pipe(), and .compose() onto a Wrapper
-function attachWrapper<S extends Dim[], T>(
+function assembleWrapper<S extends Dim[], T>(
   w: Wrapper<S, T>,
 ): Assembled<Wrapper<S, T>> {
   const asData = (): Pirell<S, T> => ({ shape: w.shape, value: w.value });
@@ -50,11 +49,18 @@ function attachWrapper<S extends Dim[], T>(
   return w as any;
 }
 
-// Wire .extend() (append op as step) and .pipe() (append fns as steps) onto a Deferred
-function attachDeferred<In extends Dim[], Out extends Dim[], T, R>(
-  run: Deferred<In, Out, T, R>,
+// Build a Deferred from an accumulated step list and wire .extend()/.pipe()/.compose()
+function assembleDeferred(
   steps: Array<(data: Pirell<any, any>) => Pirell<any, any>>,
-): Assembled<Deferred<In, Out, T, R>> {
+): Assembled<Deferred<any, any, any, any>> {
+  const run = ((data: Pirell<any, any>) =>
+    steps.reduce((acc, step) => step(acc), data)) as Deferred<
+    any,
+    any,
+    any,
+    any
+  >;
+
   (run as any).extend = function <Ops extends OpMap>(ops: Ops) {
     wireOps(run, ops, (op, args) =>
       assembleDeferred([
@@ -77,26 +83,6 @@ function attachDeferred<In extends Dim[], Out extends Dim[], T, R>(
   };
 
   return run as any;
-}
-
-function assembleWrapper<S extends Dim[], T>(w: Wrapper<S, T>) {
-  return attachWrapper(w);
-}
-
-// Rebuilds a Deferred from an accumulated step list and re-attaches
-// .extend()/.pipe() — each call produces a new immutable surface over
-// the extended steps, same pattern as assembleWrapper.
-function assembleDeferred(
-  steps: Array<(data: Pirell<any, any>) => Pirell<any, any>>,
-) {
-  const run = ((data: Pirell<any, any>) =>
-    steps.reduce((acc, step) => step(acc), data)) as Deferred<
-    any,
-    any,
-    any,
-    any
-  >;
-  return attachDeferred(run, steps);
 }
 
 // Public entry: pirell(data) → assembled Wrapper; pirell() → assembled Deferred

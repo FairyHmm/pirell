@@ -2,16 +2,7 @@ import { describe, it, expect } from "vitest";
 import { pirell } from "./assemble.js";
 import { compose } from "./compose.js";
 import { Wrapper } from "./pirell.js";
-import type { Pirell as PirellT } from "./types.js";
-
-const double = (data: PirellT<any, number[]>) => ({
-  shape: data.shape,
-  value: data.value.map((n: number) => n * 2),
-});
-const sumAll = (data: PirellT<any, number[]>) => ({
-  shape: [] as const,
-  value: data.value.reduce((a: number, b: number) => a + b, 0),
-});
+import { double, sumAll } from "./test-utils.js";
 
 describe("Wrapper.extend (assembled)", () => {
   it("wires a fluent method and rewraps the result", () => {
