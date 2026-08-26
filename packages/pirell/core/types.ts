@@ -13,12 +13,14 @@ export type Op<
   Args extends any[] = [],
 > = (data: Pirell<In, T>, ...args: Args) => Pirell<Out, R>;
 
+// Not `this`-typed: method closes over op at attach time,
+// then narrows on each .extend() so pre-call shape no longer matches.
 export type Fluent<F extends Op<any, any, any, any, any>> =
-  F extends Op<infer In, infer Out, infer T, infer R, infer Args>
-    ? (this: Wrapper<In, T>, ...args: Args) => Wrapper<Out, R>
+  F extends Op<any, infer Out, any, infer R, infer Args>
+    ? (...args: Args) => Wrapper<Out, R>
     : never;
 
-// Forward declaration to avoid circular dependency with pirell.ts.
+// Forward declaration to avoid circular dependency.
 export interface Wrapper<S extends Dim[], T> {
   shape: S;
   value: T;

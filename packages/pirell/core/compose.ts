@@ -1,7 +1,5 @@
-// Recursively validates that each function's output matches the next
-// function's input, and derives the pipeline's overall return type by
-// walking the tuple to its last element. Unlimited arity
-type ComposeFns<Fns extends unknown[], Acc> = Fns extends [
+// Chain-validated typing for fluent .pipe()/.compose()
+export type ComposeFns<Fns extends unknown[], Acc> = Fns extends [
   (arg: Acc) => infer R,
   ...infer Rest,
 ]
@@ -10,14 +8,14 @@ type ComposeFns<Fns extends unknown[], Acc> = Fns extends [
     : [(arg: Acc) => R, ...ComposeFns<Rest, R>]
   : never;
 
-type ComposeReturn<Fns extends unknown[]> = Fns extends [
+export type ComposeReturn<Fns extends unknown[]> = Fns extends [
   ...unknown[],
   (arg: any) => infer R,
 ]
   ? R
   : never;
 
-// Deferred form: returns a plain function, applies nothing until called.
+// Returns a plain function, applies nothing until called.
 export function compose<
   A,
   Fns extends [(arg: A) => any, ...Array<(arg: any) => any>],
@@ -26,7 +24,7 @@ export function compose(...fns: Array<(x: any) => any>): (x: any) => any {
   return (x: any) => fns.reduce((acc, fn) => fn(acc), x);
 }
 
-// Immediate form: data-first, applies now instead of returning a func
+// Data-first: applies now instead of returning a func
 export function pipe<
   A,
   Fns extends [(arg: A) => any, ...Array<(arg: any) => any>],

@@ -1,7 +1,6 @@
-import { Wrapper } from "./pirell.js";
 import type { Op, Pirell } from "./types.js";
 
-// Loop over ops and attach each as a bound method on target, using the caller-supplied apply strategy
+// Attach each op as a bound method on target
 export function wireOps<
   Ops extends Record<string, Op<any, any, any, any, any>>,
   R,
@@ -17,7 +16,6 @@ export function wireOps<
 }
 
 // Two calling conventions: extend(surface, ops) or extend(ops)(surface)
-// Also accepts a single function: extend(double) — passthrough for pipe/compose compatibility
 export function extend<Ops extends Record<string, Op<any, any, any, any, any>>>(
   surface: any,
   ops: Ops,
@@ -38,20 +36,15 @@ export function extend(surfaceOrOps: any, ops?: any): any {
   return (surface: any) => applyExtend(surface, surfaceOrOps);
 }
 
+// Assembled surface always has .extend(); no fallback needed.
 function applyExtend(
   surface: any,
   ops: Record<string, Op<any, any, any, any, any>>,
 ): any {
-  if (typeof surface.extend === "function") {
-    return surface.extend(ops);
+  if (typeof surface.extend !== "function") {
+    throw new TypeError(
+      "extend(surface, ops): surface has no .extend() method — pass an assembled pirell() surface.",
+    );
   }
-  const result = Object.keys(ops).reduce((data: Pirell<any, any>, name) => {
-    const op = ops[name]!;
-    return op(data);
-  }, surface);
-  const w = new Wrapper(result.shape, result.value);
-  wireOps(w, ops, (op, args) =>
-    op({ shape: w.shape, value: w.value }, ...args),
-  );
-  return w;
+  return surface.extend(ops);
 }
