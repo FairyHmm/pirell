@@ -1,11 +1,16 @@
 import type { Deferred, Dim, Pirell } from "./types.js";
+import { makeLazyShapeProxy } from "./shape.js";
 
-// Bare data-bound surface: shape + value only. No methods
+// Bare data-bound surface: shape + value only
 export class Wrapper<S extends Dim[], T> {
+  public readonly shape: S;
+
   constructor(
-    public readonly shape: S,
+    shape: S,
     public readonly value: T,
-  ) {}
+  ) {
+    this.shape = shape;
+  }
 }
 
 type Step = (data: Pirell<any, any>) => Pirell<any, any>;
@@ -23,11 +28,18 @@ function makeDeferred<In extends Dim[], Out extends Dim[], T, R>(
     runSteps(steps, data)) as unknown as Deferred<In, Out, T, R>;
 }
 
-export function pirell<T>(data: T[]): Wrapper<["i"], T[]>;
 export function pirell(): Deferred<[], [], undefined, undefined>;
-export function pirell<T>(data?: T[]): unknown {
+export function pirell<T>(data: T): Wrapper<Dim[], T>;
+export function pirell<T>(data?: T): unknown {
   if (arguments.length === 0) {
     return makeDeferred([]);
   }
-  return new Wrapper(["i"], data);
+// pirell(undefined) is distinct from pirell() — throw explicitly
+  if (data === undefined) {
+    throw new TypeError(
+      "pirell(undefined) is not valid — call pirell() for a deferred builder, or pass a JSON value.",
+    );
+  }
+  const shape = makeLazyShapeProxy(data);
+  return new Wrapper(shape, data);
 }
