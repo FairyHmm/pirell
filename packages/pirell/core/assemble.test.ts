@@ -8,6 +8,7 @@ import {
   toEntries,
   sumValues,
   flattenEntries,
+  stringifyValues,
 } from "./test-utils.js";
 
 describe("Wrapper.extend (assembled)", () => {
@@ -26,7 +27,8 @@ describe("Wrapper.extend (assembled)", () => {
     });
     const result = ext.toEntries();
 
-    expect(result.shape).toEqual(["i"]);
+    // toEntries output is Mixed<'i'>: outer dim is 'i', children non-uniform
+    expect(result.shape[0].__mixed).toBe("i");
     expect(result.value).toEqual([
       ["a", 1],
       ["b", 2],
@@ -43,9 +45,9 @@ describe("Wrapper.extend (assembled)", () => {
     expect(result.value).toEqual({ a: 3, b: 7 });
   });
 
-  it("chains multiple extends with shape transitions", () => {
+  it("chains extends on successive results", () => {
     const ext1 = (pirell({ a: 1, b: 2 }) as any).extend({ toEntries });
-    const ext2 = ext1.extend({ flattenEntries });
+    const ext2 = ext1.toEntries().extend({ flattenEntries });
     const result = ext2.flattenEntries();
 
     expect(result.shape).toEqual(["i"]);
@@ -95,9 +97,8 @@ describe("Deferred.extend (assembled)", () => {
       .double()
       .extend({ sumAll })
       .sumAll();
-    expect(typeof chain).toBe("function");
 
-    const result = chain({ shape: ["i"], value: [1, 2, 3] });
+    const result = chain(pirell([1, 2, 3]));
     expect(result.value).toBe(12); // (1+2+3)*2
   });
 
@@ -107,10 +108,8 @@ describe("Deferred.extend (assembled)", () => {
       .toEntries()
       .extend({ flattenEntries })
       .flattenEntries();
-    expect(typeof chain).toBe("function");
 
-    const result = chain({ shape: ["k"], value: { a: 1, b: 2 } });
-    expect(result.shape).toEqual(["i"]);
+    const result = chain(pirell({ a: 1, b: 2 }));
     expect(result.value).toEqual([1, 2]);
   });
 
@@ -120,13 +119,9 @@ describe("Deferred.extend (assembled)", () => {
       .sumValues()
       .extend({ toEntries })
       .toEntries();
-    expect(typeof chain).toBe("function");
 
-    const result = chain({
-      shape: ["k", "i"],
-      value: { a: [1, 2], b: [3, 4] },
-    });
-    expect(result.shape).toEqual(["i"]);
+    const result = chain(pirell({ a: [1, 2], b: [3, 4] }));
+    expect(result.shape[0].__mixed).toBe("i");
     expect(result.value).toEqual([
       ["a", 3],
       ["b", 7],
@@ -135,20 +130,17 @@ describe("Deferred.extend (assembled)", () => {
 });
 
 describe("Deferred.pipe (assembled)", () => {
-  it("appends plain functions as steps without running them", () => {
+  it("applies steps and returns a result", () => {
     const chain = (pirell() as any).pipe(double, sumAll);
-    expect(typeof chain).toBe("function");
 
-    const result = chain({ shape: ["i"], value: [1, 2, 3] });
+    const result = chain(pirell([1, 2, 3]));
     expect(result.value).toBe(12);
   });
 
   it("pipes through shape transitions", () => {
     const chain = (pirell() as any).pipe(toEntries, flattenEntries, double);
-    expect(typeof chain).toBe("function");
 
-    const result = chain({ shape: ["k"], value: { a: 1, b: 2 } });
-    expect(result.shape).toEqual(["i"]);
+    const result = chain(pirell({ a: 1, b: 2 }));
     expect(result.value).toEqual([2, 4]);
   });
 
@@ -158,26 +150,52 @@ describe("Deferred.pipe (assembled)", () => {
       .double();
     const run = compose(doubled, sumAll);
 
-    const result = run({ shape: ["i"], value: [1, 2, 3] });
+    const result = run(pirell([1, 2, 3]));
     expect(result.value).toBe(12);
   });
 });
 
 describe("Deferred.compose (assembled)", () => {
-  it("appends a composed step without running it", () => {
+  it("applies steps and returns a result", () => {
     const chain = (pirell() as any).compose(double, sumAll);
-    expect(typeof chain).toBe("function");
 
-    const result = chain({ shape: ["i"], value: [1, 2, 3] });
+    const result = chain(pirell([1, 2, 3]));
     expect(result.value).toBe(12);
   });
 
   it("composes with shape transitions", () => {
     const chain = (pirell() as any).compose(toEntries, flattenEntries, double);
-    expect(typeof chain).toBe("function");
 
-    const result = chain({ shape: ["k"], value: { a: 1, b: 2 } });
-    expect(result.shape).toEqual(["i"]);
+    const result = chain(pirell({ a: 1, b: 2 }));
     expect(result.value).toEqual([2, 4]);
+  });
+});
+
+describe("Mixed<'k'> (k... shaped nodes)", () => {
+  it("Wrapper: accepts an object with non-uniform values via Mixed<'k'> op", () => {
+    const data = { name: "alice", age: 30, active: true };
+    const ext = (pirell(data) as any).extend({ stringifyValues });
+    const result = ext.stringifyValues();
+
+    expect(result.shape).toEqual(["k"]);
+    expect(result.value).toEqual({ name: "alice", age: "30", active: "true" });
+  });
+
+  it("Deferred: pipes Mixed<'k'> op over a non-uniform object", () => {
+    const chain = (pirell() as any).pipe(stringifyValues);
+
+    const result = chain(pirell({ x: 1, y: "hello", z: false }));
+    expect(result.value).toEqual({ x: "1", y: "hello", z: "false" });
+  });
+
+  it("chains Mixed<'k'> -> toEntries -> flattenEntries in a pipe", () => {
+    const result = (pirell({ id: 42, label: "foo" }) as any).pipe(
+      stringifyValues,
+      toEntries,
+      flattenEntries,
+    );
+
+    expect(result.shape).toEqual(["i"]);
+    expect(result.value).toEqual(["42", "foo"]);
   });
 });

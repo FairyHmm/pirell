@@ -1,6 +1,14 @@
 import { Wrapper, pirell as rawPirell } from "./pirell.js";
 import { matchesInPrefix, chainableAt } from "./shape.js";
-import type { Deferred, Dim, Fluent, Op, Pirell, MatchesIn } from "./types.js";
+import type {
+  Deferred,
+  Dim,
+  Fluent,
+  Op,
+  Pirell,
+  MatchesIn,
+  ShapeElem,
+} from "./types.js";
 import { wireOps } from "./extend.js";
 import { compose } from "./compose.js";
 import type { ComposeFns, ComposeReturn } from "./compose.js";
@@ -28,7 +36,7 @@ type InMatches<S, Op1 extends Op<any, any, any, any, any>> =
     : false;
 
 // Retypes the surface after an op to reflect the new output shape.
-type Reassembled<S, Shp extends Dim[], T> =
+type Reassembled<S, Shp extends ShapeElem[], T> =
   S extends Wrapper<any, any>
     ? Assembled<Wrapper<Shp, T>>
     : S extends Deferred<infer In, any, infer OrigT, any>
@@ -40,7 +48,7 @@ export type PipeChain<Fns extends unknown[], Acc> = Fns extends [
   (arg: Acc) => infer R,
   ...infer Rest,
 ]
-  ? Acc extends Pirell<infer AShape extends Dim[], infer AT>
+  ? Acc extends Pirell<infer AShape extends ShapeElem[], infer AT>
     ? Fns[0] extends Op<infer FIn, infer FOut, AT, infer FR, any>
       ? MatchesIn<FIn, AShape> extends AShape
         ? Rest extends []
@@ -85,7 +93,9 @@ type Assembled<S> = S & {
 };
 
 // Build-time chain check: rejects pairs whose declared shapes disagree
-function checkChainShapes(fns: Array<{ in?: Dim[]; out?: Dim[] }>): void {
+function checkChainShapes(
+  fns: Array<{ in?: ShapeElem[]; out?: ShapeElem[] }>,
+): void {
   for (let i = 0; i < fns.length - 1; i++) {
     const prev = fns[i]!;
     const next = fns[i + 1]!;
@@ -98,7 +108,7 @@ function checkChainShapes(fns: Array<{ in?: Dim[]; out?: Dim[] }>): void {
 }
 
 // Wire fluent methods onto a Wrapper
-function assembleWrapper<S extends Dim[], T>(
+function assembleWrapper<S extends ShapeElem[], T>(
   w: Wrapper<S, T>,
 ): Assembled<Wrapper<S, T>> {
   const asData = (): Pirell<S, T> => ({ shape: w.shape, value: w.value });
@@ -107,7 +117,7 @@ function assembleWrapper<S extends Dim[], T>(
     const next = assembleWrapper(new Wrapper(w.shape, w.value));
     wireOps(next, ops, (op, args) => {
       const data = asData();
-      if (!matchesInPrefix(op, data.shape as Dim[])) {
+      if (!matchesInPrefix(op, data.shape as ShapeElem[])) {
         throw new TypeError(
           `extend(): op's declared In (${JSON.stringify((op as any).in)}) does not match the data's actual shape prefix.`,
         );
@@ -119,10 +129,13 @@ function assembleWrapper<S extends Dim[], T>(
   };
 
   (w as any).pipe = function (...fns: Array<(x: any) => any>) {
-    checkChainShapes(fns as Array<{ in?: Dim[]; out?: Dim[] }>);
+    checkChainShapes(fns as Array<{ in?: ShapeElem[]; out?: ShapeElem[] }>);
     const data = asData();
-    const first = fns[0] as { in?: Dim[] } | undefined;
-    if (first !== undefined && !matchesInPrefix(first, data.shape as Dim[])) {
+    const first = fns[0] as { in?: ShapeElem[] } | undefined;
+    if (
+      first !== undefined &&
+      !matchesInPrefix(first, data.shape as ShapeElem[])
+    ) {
       throw new TypeError(
         `pipe(): first step's declared In (${JSON.stringify(first.in)}) does not match the data's actual shape prefix.`,
       );
@@ -132,10 +145,13 @@ function assembleWrapper<S extends Dim[], T>(
   };
 
   (w as any).compose = function (...fns: Array<(x: any) => any>) {
-    checkChainShapes(fns as Array<{ in?: Dim[]; out?: Dim[] }>);
+    checkChainShapes(fns as Array<{ in?: ShapeElem[]; out?: ShapeElem[] }>);
     const data = asData();
-    const first = fns[0] as { in?: Dim[] } | undefined;
-    if (first !== undefined && !matchesInPrefix(first, data.shape as Dim[])) {
+    const first = fns[0] as { in?: ShapeElem[] } | undefined;
+    if (
+      first !== undefined &&
+      !matchesInPrefix(first, data.shape as ShapeElem[])
+    ) {
       throw new TypeError(
         `compose(): first step's declared In (${JSON.stringify(first.in)}) does not match the data's actual shape prefix.`,
       );

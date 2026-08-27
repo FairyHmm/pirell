@@ -1,4 +1,4 @@
-import type { Dim } from "./types.js";
+import type { Dim, ShapeElem } from "./types.js";
 
 // Runtime marker for mixed dims (i.e. "i...") — not part of Dim union
 const MIXED_MARKER = "...";
@@ -122,28 +122,55 @@ export function fullShape(shape: Dim[]): Dim[] {
   return lazy === undefined ? [...shape] : lazy.resolveAll();
 }
 
-// Runtime prefix-check against op's declared In, resolves only In.length levels
-export function matchesInPrefix(op: { in?: Dim[] }, shape: Dim[]): boolean {
-  const inDims = op.in;
-  if (inDims === undefined || inDims.length === 0) return true;
-  for (let i = 0; i < inDims.length; i++) {
-    const actual = resolveShapeAt(shape, i)[i];
-    if (actual === undefined || actual !== inDims[i]) return false;
+// Resolve the outer 'i'/'k' string for any ShapeElem (named, mixed, or plain).
+function elemOuterDim(e: ShapeElem): Dim | null {
+  if (typeof e === "string") return e as Dim;
+  if ("__mixed" in e) return (e as { __mixed: Dim }).__mixed;
+  if ("__indexed" in e) return "i";
+  if ("__keyed" in e) return "k";
+  return null;
+}
+
+// Runtime prefix-check against op's declared In, resolves only In.length levels.
+// Mixed<D>/Indexed<T>/Keyed<T> in op.in: outer dim must match actual; type params
+// are compile-time only and not checked at runtime.
+export function matchesInPrefix(
+  op: { in?: ShapeElem[] },
+  shape: ShapeElem[],
+): boolean {
+  const inElems = op.in;
+  if (inElems === undefined || inElems.length === 0) return true;
+  for (let i = 0; i < inElems.length; i++) {
+    const actual = resolveShapeAt(shape as Dim[], i)[i] as
+      ShapeElem | undefined;
+    if (actual === undefined) return false;
+    const expected = inElems[i]!;
+    const expectedDim = elemOuterDim(expected);
+    const actualDim = elemOuterDim(actual);
+    if (expectedDim !== actualDim) return false;
   }
   return true;
 }
 
-// Structural equality of two declared shapes — for build-time chain checking
-function dimsEqual(a: readonly Dim[], b: readonly Dim[]): boolean {
-  return a.length === b.length && a.every((d, i) => d === b[i]);
+// Structural equality of two declared shape elements — for build-time chain checking.
+// All object forms (Mixed, Indexed, Keyed) compare by outer dim only.
+function elemsEqual(a: ShapeElem, b: ShapeElem): boolean {
+  return elemOuterDim(a) === elemOuterDim(b);
+}
+
+function elemsArrayEqual(
+  a: readonly ShapeElem[],
+  b: readonly ShapeElem[],
+): boolean {
+  return a.length === b.length && a.every((e, i) => elemsEqual(e, b[i]!));
 }
 
 // Check if chaining next after prevOut is provably valid (no data needed)
 export function chainableAt(
-  prevOut: readonly Dim[] | undefined,
-  next: { in?: Dim[] },
+  prevOut: readonly ShapeElem[] | undefined,
+  next: { in?: ShapeElem[] },
 ): boolean {
   if (prevOut === undefined || next.in === undefined) return true;
   const n = Math.min(prevOut.length, next.in.length);
-  return dimsEqual(prevOut.slice(0, n), next.in.slice(0, n));
+  return elemsArrayEqual(prevOut.slice(0, n), next.in.slice(0, n));
 }

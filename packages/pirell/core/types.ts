@@ -1,31 +1,83 @@
 export type Dim = "i" | "k";
 
-export type Pirell<S extends Dim[], T> = {
+// Named dims: full form of 'i'/'k' carrying element/value type information.
+export type Indexed<T> = { readonly __indexed: T };
+export type Keyed<T> = { readonly __keyed: T };
+
+// Use ShapeElem[] wherever a shape is expected; Dim only for a single dim value.
+export type ShapeElem =
+  Dim | Indexed<any> | Keyed<any> | Mixed<Dim, ShapeElem[][]>;
+
+export type Pirell<S extends ShapeElem[], T> = {
   shape: S;
   value: T;
 };
 
-// Bound shape: prefix is asserted, remainder is wildcard
-export type Continued<S extends Dim[]> = S & { readonly __continued: true };
+// Bound shape: prefix is asserted, remainder is wildcard.
+// S can contain Mixed elements — e.g. [Mixed<"k">, "i", ...].
+export type Continued<S extends ShapeElem[]> = S & {
+  readonly __continued: true;
+};
 
-// Mixed dim: children are non-uniform, no single wrapped stack describes them
-export type Mixed<D extends Dim, Variants extends Dim[] = Dim[]> = {
+// Mixed dim: a D-keyed node whose children are non-uniform.
+export type Mixed<
+  D extends Dim,
+  Variants extends ShapeElem[][] = ShapeElem[][],
+> = {
   readonly __mixed: D;
   readonly __variants: Variants;
 };
 
 // Check brand directly: `S extends Continued<any>` always resolves to true
-export type IsContinued<S extends Dim[]> = S extends {
+export type IsContinued<S extends ShapeElem[]> = S extends {
   readonly __continued: true;
 }
   ? true
   : false;
 
-// Strips the Continued brand back down to a plain Dim[] for structural checks.
-type Bare<S extends Dim[]> = S extends Continued<infer B> ? B : S;
+// Strips the Continued brand back down to a plain ShapeElem[] for structural checks.
+type Bare<S extends ShapeElem[]> = S extends Continued<infer B> ? B : S;
 
-// In matches Actual: continued = prefix match, solid = exact match
-export type MatchesIn<In extends Dim[], Actual extends Dim[]> =
+// Whether an In element matches an Actual element at the same position.
+type ElemMatches<InE extends ShapeElem, ActualE extends ShapeElem> =
+  InE extends Mixed<infer D>
+    ? ActualE extends D
+      ? true
+      : false
+    : InE extends Indexed<infer IT>
+      ? ActualE extends Indexed<infer AT>
+        ? AT extends IT
+          ? true
+          : false
+        : ActualE extends "i"
+          ? IT extends unknown
+            ? true
+            : false
+          : false
+      : InE extends Keyed<infer KT>
+        ? ActualE extends Keyed<infer AKT>
+          ? AKT extends KT
+            ? true
+            : false
+          : ActualE extends "k"
+            ? KT extends unknown
+              ? true
+              : false
+            : false
+        : InE extends "i"
+          ? ActualE extends "i" | Indexed<any>
+            ? true
+            : false
+          : InE extends "k"
+            ? ActualE extends "k" | Keyed<any>
+              ? true
+              : false
+            : InE extends ActualE
+              ? true
+              : false;
+
+// In matches Actual: continued = prefix match, solid = exact match.
+export type MatchesIn<In extends ShapeElem[], Actual extends ShapeElem[]> =
   IsContinued<In> extends true
     ? MatchesPrefix<Bare<In>, Actual> extends true
       ? Actual
@@ -34,31 +86,53 @@ export type MatchesIn<In extends Dim[], Actual extends Dim[]> =
       ? Actual
       : never;
 
-type MatchesPrefix<In extends Dim[], Actual extends Dim[]> = In extends []
+type MatchesPrefix<
+  In extends ShapeElem[],
+  Actual extends ShapeElem[],
+> = In extends []
   ? true
-  : Actual extends [In[0], ...infer RestActual extends Dim[]]
-    ? In extends [any, ...infer InTail extends Dim[]]
-      ? MatchesPrefix<InTail, RestActual>
+  : In extends [
+        infer InHead extends ShapeElem,
+        ...infer InTail extends ShapeElem[],
+      ]
+    ? Actual extends [
+        infer AHead extends ShapeElem,
+        ...infer ATail extends ShapeElem[],
+      ]
+      ? ElemMatches<InHead, AHead> extends true
+        ? MatchesPrefix<InTail, ATail>
+        : false
       : false
     : false;
 
-type MatchesExact<In extends Dim[], Actual extends Dim[]> = In extends []
+type MatchesExact<
+  In extends ShapeElem[],
+  Actual extends ShapeElem[],
+> = In extends []
   ? Actual extends []
     ? true
     : false
-  : Actual extends [In[0], ...infer RestActual extends Dim[]]
-    ? In extends [any, ...infer InTail extends Dim[]]
-      ? MatchesExact<InTail, RestActual>
+  : In extends [
+        infer InHead extends ShapeElem,
+        ...infer InTail extends ShapeElem[],
+      ]
+    ? Actual extends [
+        infer AHead extends ShapeElem,
+        ...infer ATail extends ShapeElem[],
+      ]
+      ? ElemMatches<InHead, AHead> extends true
+        ? MatchesExact<InTail, ATail>
+        : false
       : false
     : false;
 
-// Extract input type T when In matches Actual
-export type ExtractIn<In extends Dim[], Actual extends Dim[], T> =
+// Extract input type T when In matches Actual.
+export type ExtractIn<In extends ShapeElem[], Actual extends ShapeElem[], T> =
   MatchesIn<In, Actual> extends Actual ? T : never;
 
 export type Op<
-  In extends Dim[],
-  Out extends Dim[],
+  In extends ShapeElem[],
+  Out extends ShapeElem[],
   T,
   R,
   Args extends any[] = [],
@@ -68,10 +142,20 @@ export type Op<
   readonly out?: Out;
 };
 
-// Attach In/Out at runtime so callers can check chain against shapes
+// Named dim factories — call once at module level, not per data point.
+// idim<T>() for indexed (T is the element type); kdim<T>() for keyed (T is value type).
+// 'i'/'k' shorthands remain valid everywhere and carry no type information.
+export function idim<T>(): Indexed<T> {
+  return { __indexed: undefined } as unknown as Indexed<T>;
+}
+export function kdim<T>(): Keyed<T> {
+  return { __keyed: undefined } as unknown as Keyed<T>;
+}
+
+// Attach In/Out at runtime so callers can check chain against shapes.
 export function defineOp<
-  In extends Dim[],
-  Out extends Dim[],
+  In extends ShapeElem[],
+  Out extends ShapeElem[],
   T,
   R,
   Args extends any[] = [],
@@ -95,12 +179,17 @@ export type Fluent<F extends Op<any, any, any, any, any>> =
     : never;
 
 // Forward declaration to avoid circular dependency.
-export interface Wrapper<S extends Dim[], T> {
+export interface Wrapper<S extends ShapeElem[], T> {
   shape: S;
   value: T;
 }
 
-export interface Deferred<In extends Dim[], Out extends Dim[], T, R> {
+export interface Deferred<
+  In extends ShapeElem[],
+  Out extends ShapeElem[],
+  T,
+  R,
+> {
   (data: Pirell<In, T>): Pirell<Out, R>;
 }
 
