@@ -1,13 +1,6 @@
 import { Wrapper, pirell as rawPirell } from "./pirell.js";
-import type {
-  Deferred,
-  Dim,
-  Fluent,
-  Op,
-  Pirell,
-  MatchesIn,
-  Shape,
-} from "./types.js";
+import type { Deferred, Dim, Fluent, Op, Pirell, Shape } from "./types.js";
+import type { MatchesIn } from "./match.js";
 import { wireOps } from "./extend.js";
 import { compose } from "./compose.js";
 import type { ComposeFns, ComposeReturn } from "./compose.js";
@@ -23,16 +16,6 @@ type CurrentData<S> =
     : S extends Deferred<any, infer Out extends Shape>
       ? Pirell<Out>
       : never;
-
-// Op's In must prefix-match current data shape
-type InMatches<S, Op1 extends Op<any, any, any>> =
-  Op1 extends Op<infer In, any, any>
-    ? CurrentData<S> extends Pirell<infer Actual>
-      ? MatchesIn<In, Actual> extends Actual
-        ? true
-        : false
-      : false
-    : false;
 
 // Retypes the surface after an op to reflect the new output shape.
 type Reassembled<S, Shp extends Shape> =
@@ -66,9 +49,9 @@ export type PipeChain<Fns extends unknown[], Acc> = Fns extends [
 // instead of erasing to untyped arrays.
 type Assembled<S> = S & {
   extend<K extends string, Op1 extends Op<any, any, any>>(
-    ops: InMatches<S, Op1> extends true
-      ? Op1 extends Op<infer In, any, any>
-        ? CurrentData<S> extends Pirell<In>
+    ops: Op1 extends Op<infer In, any, any>
+      ? CurrentData<S> extends Pirell<infer Actual extends Shape>
+        ? MatchesIn<In, Actual> extends Actual
           ? Record<K, Op1>
           : never
         : never
@@ -78,7 +61,13 @@ type Assembled<S> = S & {
     : never;
   extend<Ops extends OpMap>(
     ops: Ops & {
-      [K in keyof Ops]: InMatches<S, Ops[K]> extends true ? Ops[K] : never;
+      [K in keyof Ops]: Ops[K] extends Op<infer In, any, any>
+        ? CurrentData<S> extends Pirell<infer Actual extends Shape>
+          ? MatchesIn<In, Actual> extends Actual
+            ? Ops[K]
+            : never
+          : never
+        : never;
     },
   ): Assembled<S> & {
     [K in keyof Ops]: Fluent<Ops[K] & Op<any, any, any>>;
@@ -92,7 +81,7 @@ type Assembled<S> = S & {
 };
 
 // Wire fluent methods onto a Wrapper. Shape checking is compile-time only
-// (InMatches/PipeChain above) — no runtime shape to read or throw against.
+// (MatchesIn/PipeChain above) — no runtime shape to read or throw against.
 function assembleWrapper<S extends Shape>(
   w: Wrapper<S>,
 ): Assembled<Wrapper<S>> {

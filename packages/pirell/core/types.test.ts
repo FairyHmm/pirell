@@ -1,5 +1,6 @@
 import { describe, expectTypeOf, it } from "vitest";
-import type { MatchesIn, Op, Pirell, Shape } from "./types.js";
+import type { Op, Pirell, Shape } from "./types.js";
+import type { MatchesIn } from "./match.js";
 
 // Two keyed-mixed shapes with distinct field types, used to test both
 // named-field acceptance and field-type rejection below.
