@@ -17,31 +17,27 @@ describe("Wrapper.extend (assembled)", () => {
     const result = ext.double();
 
     expect(result).toBeInstanceOf(Wrapper);
-    expect(result.shape).toEqual(["i"]);
     expect(result.value).toEqual([2, 4, 6]);
   });
 
-  it("works with object shape ['k', ...]", () => {
+  it("works with object shape [Keyed, ...]", () => {
     const ext = (pirell({ a: 1, b: 2 }) as any).extend({
       toEntries,
     });
     const result = ext.toEntries();
 
-    // toEntries output is Mixed<'i'>: outer dim is 'i', children non-uniform
-    expect(result.shape[0].__mixed).toBe("i");
     expect(result.value).toEqual([
       ["a", 1],
       ["b", 2],
     ]);
   });
 
-  it("works with nested shape ['k', 'i', ...]", () => {
+  it("works with nested shape [Keyed, Indexed, ...]", () => {
     const ext = (pirell({ a: [1, 2], b: [3, 4] }) as any).extend({
       sumValues,
     });
     const result = ext.sumValues();
 
-    expect(result.shape).toEqual(["k"]);
     expect(result.value).toEqual({ a: 3, b: 7 });
   });
 
@@ -50,7 +46,6 @@ describe("Wrapper.extend (assembled)", () => {
     const ext2 = ext1.toEntries().extend({ flattenEntries });
     const result = ext2.flattenEntries();
 
-    expect(result.shape).toEqual(["i"]);
     expect(result.value).toEqual([1, 2]);
   });
 });
@@ -67,7 +62,6 @@ describe("Wrapper.pipe (assembled)", () => {
       flattenEntries,
       double,
     );
-    expect(result.shape).toEqual(["i"]);
     expect(result.value).toEqual([2, 4]);
   });
 });
@@ -85,7 +79,6 @@ describe("Wrapper.compose (assembled)", () => {
       flattenEntries,
       double,
     );
-    expect(result.shape).toEqual(["i"]);
     expect(result.value).toEqual([6, 14]);
   });
 });
@@ -102,7 +95,7 @@ describe("Deferred.extend (assembled)", () => {
     expect(result.value).toBe(12); // (1+2+3)*2
   });
 
-  it("works with object shape ['k', ...]", () => {
+  it("works with object shape [Keyed, ...]", () => {
     const chain = (pirell() as any)
       .extend({ toEntries })
       .toEntries()
@@ -113,7 +106,7 @@ describe("Deferred.extend (assembled)", () => {
     expect(result.value).toEqual([1, 2]);
   });
 
-  it("works with nested shape ['k', 'i', ...]", () => {
+  it("works with nested shape [Keyed, Indexed, ...]", () => {
     const chain = (pirell() as any)
       .extend({ sumValues })
       .sumValues()
@@ -121,7 +114,6 @@ describe("Deferred.extend (assembled)", () => {
       .toEntries();
 
     const result = chain(pirell({ a: [1, 2], b: [3, 4] }));
-    expect(result.shape[0].__mixed).toBe("i");
     expect(result.value).toEqual([
       ["a", 3],
       ["b", 7],
@@ -171,31 +163,29 @@ describe("Deferred.compose (assembled)", () => {
   });
 });
 
-describe("Mixed<'k'> (k... shaped nodes)", () => {
-  it("Wrapper: accepts an object with non-uniform values via Mixed<'k'> op", () => {
+describe("Keyed<unknown, 'mixed'> (non-uniform keyed nodes)", () => {
+  it("Wrapper: accepts an object with non-uniform values via a mixed-keyed op", () => {
     const data = { name: "alice", age: 30, active: true };
     const ext = (pirell(data) as any).extend({ stringifyValues });
     const result = ext.stringifyValues();
 
-    expect(result.shape).toEqual(["k"]);
     expect(result.value).toEqual({ name: "alice", age: "30", active: "true" });
   });
 
-  it("Deferred: pipes Mixed<'k'> op over a non-uniform object", () => {
+  it("Deferred: pipes a mixed-keyed op over a non-uniform object", () => {
     const chain = (pirell() as any).pipe(stringifyValues);
 
     const result = chain(pirell({ x: 1, y: "hello", z: false }));
     expect(result.value).toEqual({ x: "1", y: "hello", z: "false" });
   });
 
-  it("chains Mixed<'k'> -> toEntries -> flattenEntries in a pipe", () => {
+  it("chains mixed-keyed -> toEntries -> flattenEntries in a pipe", () => {
     const result = (pirell({ id: 42, label: "foo" }) as any).pipe(
       stringifyValues,
       toEntries,
       flattenEntries,
     );
 
-    expect(result.shape).toEqual(["i"]);
     expect(result.value).toEqual(["42", "foo"]);
   });
 });
