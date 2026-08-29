@@ -1,13 +1,15 @@
 import type { Op, Pirell } from "./types.js";
 
-// Attach each op as a bound method on target
-export function wireOps<
-  Ops extends Record<string, Op<any, any, any, any, any>>,
-  R,
->(
+// Attach each op as a bound method on target. `target: any` is correct
+// here, not a gap: wireOps's job is registration only — binding `op`
+// under a name — not verifying In/Out. That checking already happens
+// where op is actually invoked against real data (assemble.ts's
+// InMatches/PipeChain, and Op's own signature at the call site).
+// wireOps has nothing to add by re-typing what it just passes through.
+export function wireOps<Ops extends Record<string, Op<any, any, any>>>(
   target: any,
   ops: Ops,
-  apply: (op: Op<any, any, any, any, any>, args: any[]) => R,
+  apply: (op: Op<any, any, any>, args: any[]) => unknown,
 ): void {
   for (const name of Object.keys(ops)) {
     const op = ops[name]!;
@@ -16,16 +18,14 @@ export function wireOps<
 }
 
 // Two calling conventions: extend(surface, ops) or extend(ops)(surface)
-export function extend<Ops extends Record<string, Op<any, any, any, any, any>>>(
+export function extend<Ops extends Record<string, Op<any, any, any>>>(
   surface: any,
   ops: Ops,
 ): any;
-export function extend<Ops extends Record<string, Op<any, any, any, any, any>>>(
+export function extend<Ops extends Record<string, Op<any, any, any>>>(
   ops: Ops,
 ): (surface: any) => any;
-export function extend(
-  fn: (data: Pirell<any, any>) => Pirell<any, any>,
-): (x: any) => any;
+export function extend(fn: (data: Pirell<any>) => Pirell<any>): (x: any) => any;
 export function extend(surfaceOrOps: any, ops?: any): any {
   if (ops !== undefined) {
     return applyExtend(surfaceOrOps, ops);
@@ -39,7 +39,7 @@ export function extend(surfaceOrOps: any, ops?: any): any {
 // Assembled surface always has .extend(); no fallback needed.
 function applyExtend(
   surface: any,
-  ops: Record<string, Op<any, any, any, any, any>>,
+  ops: Record<string, Op<any, any, any>>,
 ): any {
   if (typeof surface.extend !== "function") {
     throw new TypeError(
