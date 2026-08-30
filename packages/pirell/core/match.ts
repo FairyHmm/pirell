@@ -70,14 +70,22 @@ export type MatchesIn<In extends Shape, Actual extends Shape> =
 // member).
 type IsUnion<T, U = T> = T extends U ? ([U] extends [T] ? false : true) : never;
 
-// Re-checks against Shape since _ShapeOf's recursion can't carry that
-// constraint itself; falls back to never if it ever misbehaves.
-export type ShapeOf<D> = _ShapeOf<D> extends Shape ? _ShapeOf<D> : never;
-
-// A container whose element type is a genuine union is heterogeneous
-// by construction — e.g. `[["a",1],["b",2]]` infers each row as
+// ShapeOf<D> derives a Shape from a value's static type. The recheck
+// against Shape isn't insurance against a wrong runtime answer — every
+// branch below is already Shape-shaped by construction — it's required
+// for tsc's own inference: Check<In, D> below feeds ShapeOf<D> into
+// MatchesIn<In extends Shape, Actual extends Shape>, and tsc can't carry
+// the Shape constraint through an un-rechecked conditional type into that
+// call site (confirmed: removing the recheck breaks Check's own
+// declaration with a real "not assignable to Shape" error, not a
+// hypothetical one).
+//
+// A container whose element type is a genuine union is heterogeneous by
+// construction — e.g. `[["a",1],["b",2]]` infers each row as
 // `(string|number)[]`, not a tuple, so that row is "i...". Structural
 // fact, not a reinterpretation — no exceptions per literal shape.
+export type ShapeOf<D> = _ShapeOf<D> extends Shape ? _ShapeOf<D> : never;
+
 type _ShapeOf<D> =
   D extends Raw<infer S>
     ? S
