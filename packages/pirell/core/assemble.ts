@@ -1,9 +1,9 @@
-import { Wrapper, pirell as rawPirell } from "./pirell.js";
-import type { Deferred, Dim, Fluent, Op, Pirell, Shape } from "./types.js";
+import { pirell as rawPirell } from "./pirell.js";
+import type { Deferred, Dim, Fluent, Op, Raw, Shape, Wrapper } from "./types.js";
 import type { MatchesIn } from "./match.js";
 import { wireOps } from "./extend.js";
 import { compose } from "./compose.js";
-import type { ComposeFns, ComposeReturn } from "./compose.js";
+import type { ComposeFns } from "./compose.js";
 
 // Single wiring point: primitives stay ignorant of each other.
 
@@ -12,34 +12,31 @@ type OpMap = Record<string, Op<any, any, any>>;
 // Unified output type: Wrapper and Deferred both resolve to what the next op sees.
 type CurrentData<S> =
   S extends Wrapper<infer Shp extends Shape>
-    ? Pirell<Shp>
-    : S extends Deferred<any, infer Out extends Shape>
-      ? Pirell<Out>
+    ? Raw<Shp>
+    : S extends Deferred<infer Out extends Shape>
+      ? Raw<Out>
       : never;
 
 // Retypes the surface after an op to reflect the new output shape.
 type Reassembled<S, Shp extends Shape> =
   S extends Wrapper<any>
     ? Assembled<Wrapper<Shp>>
-    : S extends Deferred<infer In, any>
-      ? Assembled<Deferred<In, Shp>>
+    : S extends Deferred<any>
+      ? Assembled<Deferred<Shp>>
       : never;
 
-// Shape-checked chain typing for .pipe()/.compose()
+// Shape-checked chain typing for .pipe()/.compose(). Acc is Raw<Shape>
+// (phantom-branded), so op detection keys off Op<In,Out,Args> directly.
 export type PipeChain<Fns extends unknown[], Acc> = Fns extends [
   (arg: Acc) => infer R,
   ...infer Rest,
 ]
-  ? Acc extends Pirell<infer AShape extends Shape>
-    ? Fns[0] extends Op<infer FIn, infer FOut, any>
-      ? MatchesIn<FIn, AShape> extends AShape
-        ? Rest extends []
-          ? [(arg: Acc) => R]
-          : [(arg: Acc) => R, ...PipeChain<Rest, Pirell<FOut>>]
-        : never
-      : Rest extends []
+  ? Fns[0] extends Op<infer FIn, infer FOut, any>
+    ? MatchesIn<FIn, Extract<Acc, Shape>> extends Shape
+      ? Rest extends []
         ? [(arg: Acc) => R]
-        : [(arg: Acc) => R, ...PipeChain<Rest, R>]
+        : [(arg: Acc) => R, ...PipeChain<Rest, Raw<FOut>>]
+      : never
     : Rest extends []
       ? [(arg: Acc) => R]
       : [(arg: Acc) => R, ...PipeChain<Rest, R>]
@@ -50,10 +47,8 @@ export type PipeChain<Fns extends unknown[], Acc> = Fns extends [
 type Assembled<S> = S & {
   extend<K extends string, Op1 extends Op<any, any, any>>(
     ops: Op1 extends Op<infer In, any, any>
-      ? CurrentData<S> extends Pirell<infer Actual extends Shape>
-        ? MatchesIn<In, Actual> extends Actual
-          ? Record<K, Op1>
-          : never
+      ? MatchesIn<In, Extract<CurrentData<S>, Shape>> extends Shape
+        ? Record<K, Op1>
         : never
       : never,
   ): Op1 extends Op<any, infer Out, any>
@@ -62,94 +57,133 @@ type Assembled<S> = S & {
   extend<Ops extends OpMap>(
     ops: Ops & {
       [K in keyof Ops]: Ops[K] extends Op<infer In, any, any>
-        ? CurrentData<S> extends Pirell<infer Actual extends Shape>
-          ? MatchesIn<In, Actual> extends Actual
-            ? Ops[K]
-            : never
+        ? MatchesIn<In, Extract<CurrentData<S>, Shape>> extends Shape
+          ? Ops[K]
           : never
         : never;
     },
   ): Assembled<S> & {
     [K in keyof Ops]: Fluent<Ops[K] & Op<any, any, any>>;
   };
-  pipe<Fns extends [(arg: S) => any, ...Array<(arg: any) => any>]>(
-    ...fns: Fns & PipeChain<Fns, S> & ComposeFns<Fns, S>
-  ): ComposeReturn<Fns>;
-  compose<Fns extends [(arg: S) => any, ...Array<(arg: any) => any>]>(
-    ...fns: Fns & PipeChain<Fns, S> & ComposeFns<Fns, S>
-  ): ComposeReturn<Fns>;
+  pipe<Fns extends [(arg: CurrentData<S>) => any, ...Array<(arg: any) => any>]>(
+    ...fns: Fns & PipeChain<Fns, CurrentData<S>> & ComposeFns<Fns, CurrentData<S>>
+  ): S extends Wrapper<any> ? unknown : Assembled<S>;
+  compose<
+    Fns extends [(arg: CurrentData<S>) => any, ...Array<(arg: any) => any>],
+  >(
+    ...fns: Fns & PipeChain<Fns, CurrentData<S>> & ComposeFns<Fns, CurrentData<S>>
+  ): S extends Wrapper<any> ? unknown : Assembled<S>;
 };
 
-// Wire fluent methods onto a Wrapper. Shape checking is compile-time only
-// (MatchesIn/PipeChain above) — no runtime shape to read or throw against.
-function assembleWrapper<S extends Shape>(
-  w: Wrapper<S>,
-): Assembled<Wrapper<S>> {
-  const asData = (): Pirell<S> => ({ value: w.value });
+// --- Runtime surface builder ---
+//
+// Two kinds of surface, both callable:
+//   - Deferred (from pirell()): no data yet. Methods/.pipe()/.compose() append
+//     steps lazily. Calling it with raw JSON runs the steps and returns a
+//     data-bound Wrapper surface.
+//   - Wrapper (from pirell(data), or produced by calling a Deferred): raw JSON
+//     is bound. Methods apply immediately to the current value and return a new
+//     Wrapper. .pipe()/.compose() apply and return the raw JSON result.
+// Surfaces are callable so a Wrapper can be fed back as input (value is reused,
+// never re-run), which is what makes splitting a chain in two work.
 
-  (w as any).extend = function <Ops extends OpMap>(ops: Ops) {
-    const next = assembleWrapper(new Wrapper<S>(w.value));
-    wireOps(next, ops, (op, args) => {
-      const data = asData();
-      const result = op(data, ...args);
-      return assembleWrapper(new Wrapper(result.value));
-    });
-    return next;
+const SURFACE = "__pirell";
+
+const isSurface = (x: unknown): boolean =>
+  x != null &&
+  (typeof x === "function" || typeof x === "object") &&
+  SURFACE in (x as any);
+
+const valueOf = (x: unknown): unknown =>
+  isSurface(x) ? (x as any).value : x;
+
+const runSteps = (
+  steps: Array<(data: unknown) => unknown>,
+  data: unknown,
+): unknown => steps.reduce((acc, step) => step(acc), data);
+
+// Data-bound surface. `value` is the current raw JSON result.
+function buildWrapper(
+  value: unknown,
+  ops: OpMap,
+): Assembled<Wrapper<any>> {
+  const wrapper = ((input: unknown): Assembled<Wrapper<any>> => {
+    // Re-enter: reuse another surface's value, or bind raw data as-is.
+    return buildWrapper(valueOf(input), ops);
+  }) as unknown as Assembled<Wrapper<any>>;
+
+  Object.defineProperty(wrapper, SURFACE, { value: true });
+  Object.defineProperty(wrapper, "value", {
+    get: () => value,
+  });
+
+  wireOps(wrapper, ops, (op, args) =>
+    buildWrapper((op as (...a: any[]) => unknown)(value, ...args), ops),
+  );
+
+  (wrapper as any).extend = function <Ops extends OpMap>(added: Ops) {
+    return buildWrapper(value, { ...ops, ...added });
   };
 
-  (w as any).pipe = function (...fns: Array<(x: any) => any>) {
-    const data = asData();
-    const result = compose(...(fns as [(x: any) => any]))(data);
-    return assembleWrapper(new Wrapper(result.value));
+  (wrapper as any).pipe = function (...fns: Array<(x: any) => any>) {
+    return compose(...(fns as [(x: any) => any]))(value);
   };
 
-  (w as any).compose = function (...fns: Array<(x: any) => any>) {
-    const data = asData();
-    const result = (compose(...(fns as [(x: any) => any])) as (x: any) => any)(
-      data,
-    );
-    return assembleWrapper(new Wrapper(result.value));
+  (wrapper as any).compose = function (...fns: Array<(x: any) => any>) {
+    return (
+      compose as (...fns: Array<(x: any) => any>) => (x: any) => any
+    )(...fns)(value);
   };
 
-  return w as any;
+  return wrapper;
 }
 
-// Build a Deferred and wire fluent methods
-function assembleDeferred(
-  steps: Array<(data: Pirell<any>) => Pirell<any>>,
-): Assembled<Deferred<any, any>> {
-  const run = ((data: Pirell<any>) =>
-    steps.reduce((acc, step) => step(acc), data)) as Deferred<any, any>;
+// Lazy builder surface. `steps` accumulate until data is supplied.
+function buildDeferred(
+  steps: Array<(data: unknown) => unknown>,
+  ops: OpMap,
+): Assembled<Deferred<any>> {
+  const deferred = ((input: unknown): Assembled<Wrapper<any>> => {
+    if (isSurface(input)) {
+      return buildWrapper(valueOf(input), ops);
+    }
+    return buildWrapper(runSteps(steps, input), ops);
+  }) as unknown as Assembled<Deferred<any>>;
 
-  (run as any).extend = function <Ops extends OpMap>(ops: Ops) {
-    const next = assembleDeferred([...steps]);
-    wireOps(next, ops, (op, args) =>
-      assembleDeferred([...steps, (data: Pirell<any>) => op(data, ...args)]),
+  Object.defineProperty(deferred, SURFACE, { value: true });
+  Object.defineProperty(deferred, "value", {
+    get: () => undefined,
+  });
+
+  wireOps(deferred, ops, (op, args) => {
+    const step = (data: unknown) => (op as (...a: any[]) => unknown)(data, ...args);
+    return buildDeferred([...steps, step], ops);
+  });
+
+  (deferred as any).extend = function <Ops extends OpMap>(added: Ops) {
+    return buildDeferred(steps, { ...ops, ...added });
+  };
+
+  (deferred as any).pipe = function (...fns: Array<(x: any) => any>) {
+    return buildDeferred([...steps, compose(...(fns as [(x: any) => any]))], ops);
+  };
+
+  (deferred as any).compose = function (...fns: Array<(x: any) => any>) {
+    return buildDeferred(
+      [...steps, compose(...(fns as [(x: any) => any]))],
+      ops,
     );
-    return next;
   };
 
-  (run as any).pipe = function (...fns: Array<(x: any) => any>) {
-    return assembleDeferred([...steps, ...fns]);
-  };
-
-  (run as any).compose = function (...fns: Array<(x: any) => any>) {
-    return assembleDeferred([
-      ...steps,
-      (compose as (...fns: Array<(x: any) => any>) => (x: any) => any)(...fns),
-    ]);
-  };
-
-  return run as any;
+  return deferred;
 }
 
-// pirell(data) → Wrapper; pirell() → Deferred
+// pirell(data) → data-bound Wrapper; pirell() → Deferred builder
 export function pirell(data: unknown): Assembled<Wrapper<Dim[]>>;
-export function pirell(): Assembled<Deferred<[], []>>;
+export function pirell(): Assembled<Deferred<[]>>;
 export function pirell(...args: [unknown] | []): unknown {
   if (args.length === 0) {
-    return assembleDeferred([]);
+    return buildDeferred([], {});
   }
-  const w = rawPirell(args[0]);
-  return assembleWrapper(w);
+  return buildWrapper(rawPirell(args[0]).value, {});
 }

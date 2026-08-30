@@ -2,11 +2,18 @@ import type { Dim } from "./types.js";
 
 // Bare data-bound surface: value only, untyped. Shape is a compile-time
 // claim an Op's signature makes about the data (see types.ts's
-// Pirell/__shape), not something the data itself carries or returns at
+// Raw/__shape), not something the data itself carries or returns at
 // runtime — and not a second value-type channel either (see Op in
 // types.ts). data is always JSON; each Op narrows it as needed.
 export class Wrapper<S> {
-  constructor(public readonly value: unknown) {}
+  constructor(public readonly value: unknown) {
+    // Mirror pirell(undefined): a Wrapper must never hold undefined.
+    if (value === undefined) {
+      throw new TypeError(
+        "Wrapper cannot hold undefined — pass a JSON value. Use assemble.ts's pirell() with no args for the deferred-builder form.",
+      );
+    }
+  }
 }
 
 export function pirell<T>(data: T): Wrapper<Dim[]> {
