@@ -46,11 +46,8 @@ type ComposeChain<Fns> = Fns extends [infer F, ...infer Rest]
       : never
   : never;
 
-// Intended input value type of a composed chain (first fn's input).
-type ComposeIn<Fns> =
-  ComposeChain<Fns> extends [(arg: infer A) => any, ...unknown[]] ? A : never;
-
-// Result value type of a composed chain (last fn's output).
+// Result value type of a composed chain (last fn's output). Shared by both
+// compose's and pipe's Op-first overload below.
 type ComposeResult<Fns> =
   ComposeChain<Fns> extends [...unknown[], (arg: any) => infer R] ? R : never;
 
@@ -83,7 +80,11 @@ export type ComposeReturn<Fns extends unknown[]> = Fns extends [
 // Returns a plain function, applies nothing until called.
 export function compose<Fns extends unknown[]>(
   ...fns: Fns & ComposeChain<Fns>
-): (x: ComposeIn<Fns>) => ComposeResult<Fns>;
+): (
+  x: ComposeChain<Fns> extends [(arg: infer A) => any, ...unknown[]]
+    ? A
+    : never,
+) => ComposeResult<Fns>;
 export function compose(...fns: Array<(x: any) => any>): (x: any) => any {
   return (x: any) => fns.reduce((acc, fn) => fn(acc), x);
 }
