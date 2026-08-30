@@ -6,11 +6,13 @@ import {
   toEntries,
   entriesToObject,
 } from "./test-utils.js";
-import type { Raw } from "./types.js";
+
+// Head-node literals go bare (no cast) — ShapeOf derives shape
+// structurally, including mixed tails (see shape-inference.md).
 
 describe("type inference through chains", () => {
   it("i -> i: numbers stay numbered", () => {
-    const nums = [1, 2, 3] as Raw<["i"]>;
+    const nums = [1, 2, 3];
     const result = double(nums);
     // If inference works, result is Raw<["i"]> and can feed back to double
     const doubled = double(result);
@@ -18,9 +20,9 @@ describe("type inference through chains", () => {
   });
 
   it("k -> i...: object to entries preserves type through chain", () => {
-    const obj = { a: 1, b: 2 } as Raw<["k"]>;
+    const obj = { a: 1, b: 2 };
     const pairs = toEntries(obj);
-    // Result is Raw<["i..."]> — can feed to flattenEntries
+    // Result is Raw<["i","i..."]> — can feed to flattenEntries
     const values = flattenEntries(pairs);
     expect(values).toEqual([1, 2]);
   });
@@ -29,11 +31,11 @@ describe("type inference through chains", () => {
     const pairs = [
       ["a", 1],
       ["b", 2],
-    ] as Raw<["i..."]>;
+    ];
     const obj = entriesToObject(pairs);
     // obj is Raw<["k"]> — can feed back to toEntries
     const roundtrip = toEntries(obj);
-    // roundtrip is Raw<["i..."]> again — can chain further
+    // roundtrip is Raw<["i","i..."]> again — can chain further
     const values = flattenEntries(roundtrip);
     expect(values).toEqual([1, 2]);
   });
@@ -42,7 +44,7 @@ describe("type inference through chains", () => {
     const data = {
       team_a: [10, 20, 30],
       team_b: [5, 15],
-    } as Raw<["k", "i", "..."]>;
+    };
     const sums = sumValues(data);
     // Result is Raw<["k"]> — object can feed back to toEntries
     const pairs = toEntries(sums);
@@ -53,11 +55,10 @@ describe("type inference through chains", () => {
   });
 
   it("k,i,... -> k: open tail doesn't break the chain", () => {
-    // ["k", "i", "..."] means object > array > unknown depth
     const data = {
       scores: [1, 2, 3],
       other: [10, 20],
-    } as Raw<["k", "i", "..."]>;
+    };
     const sums = sumValues(data);
     // Result is Raw<["k"]> — clean, can continue
     const pairs = toEntries(sums);
@@ -69,7 +70,7 @@ describe("type inference through chains", () => {
       ["x", 10],
       ["y", 20],
       ["z", 30],
-    ] as Raw<["i..."]>;
+    ];
     const values = flattenEntries(mixed);
     // values is Raw<["i"]> — can feed to double
     const doubled = double(values);
@@ -77,7 +78,7 @@ describe("type inference through chains", () => {
   });
 
   it("complex chain: k -> i... -> i -> i", () => {
-    const obj = { p: 5, q: 10 } as Raw<["k"]>;
+    const obj = { p: 5, q: 10 };
     const pairs = toEntries(obj);
     const values = flattenEntries(pairs);
     const doubled = double(values);
@@ -89,7 +90,7 @@ describe("type rejection through chains", () => {
   it("rejects passing i to an op expecting k", () => {
     // Type check only — never runs
     if (false) {
-      const nums = [1, 2, 3] as Raw<["i"]>;
+      const nums = [1, 2, 3];
       // @ts-expect-error -- toEntries expects ["k", "..."], not ["i"]
       toEntries(nums);
     }
@@ -98,7 +99,7 @@ describe("type rejection through chains", () => {
   it("rejects passing k to an op expecting i", () => {
     // Type check only — never runs
     if (false) {
-      const obj = { a: 1 } as Raw<["k"]>;
+      const obj = { a: 1 };
       // @ts-expect-error -- double expects ["i"], not ["k"]
       double(obj);
     }
@@ -110,8 +111,8 @@ describe("type rejection through chains", () => {
       const pairs = [
         ["a", 1],
         ["b", 2],
-      ] as Raw<["i..."]>;
-      // @ts-expect-error -- double expects exactly ["i"], not ["i..."]
+      ];
+      // @ts-expect-error -- double expects exactly ["i"], not ["i","i..."]
       double(pairs);
     }
   });
@@ -119,7 +120,7 @@ describe("type rejection through chains", () => {
   it("rejects k,i when expecting k (depth mismatch)", () => {
     // Type check only — never runs
     if (false) {
-      const nested = { x: [1, 2] } as Raw<["k", "i"]>;
+      const nested = { x: [1, 2] };
       // @ts-expect-error -- toEntries expects exactly ["k"], got ["k", "i"]
       toEntries(nested);
     }

@@ -1,28 +1,24 @@
 import type { Op } from "./types.js";
 
-// No T/R on Op: In/Out are the only source of truth. Each op narrows
-// data (cast from the phantom Raw<In>) to what it actually needs — the
-// shape doesn't guarantee it at runtime. All zero-arg here, so Op
-// collapses to a single plain signature (see types.ts) — plain
-// functions assign directly, no op() factory needed.
-export const double: Op<["i"], ["i"]> = (data) =>
+// `data: unknown` is required — Op's generic call signature (see
+// types.ts/shape-inference.md) doesn't contextually type plain arrows.
+export const double: Op<["i"], ["i"]> = (data: unknown) =>
   (data as number[]).map((n) => n * 2);
 
-export const sumAll: Op<["i"], []> = (data) =>
+export const sumAll: Op<["i"], []> = (data: unknown) =>
   (data as number[]).reduce((a, b) => a + b, 0);
 
-// Keyed object ["k"] -> mixed-indexed ["i..."]:
-// each entry is a [key, value] pair with non-uniform value structure.
-export const toEntries: Op<["k"], ["i..."]> = (data) =>
+// A [k,v] pair array's rows are uniform ("i") but each row's own
+// contents vary ("i..."), not one flat mixed dimension.
+export const toEntries: Op<["k"], ["i", "i..."]> = (data: unknown) =>
   Object.entries(data as Record<string, unknown>);
 
-// ["i..."] -> ["k"]: convert pairs back to object
-export const entriesToObject: Op<["i..."], ["k"]> = (data) =>
+export const entriesToObject: Op<["i", "i..."], ["k"]> = (data: unknown) =>
   Object.fromEntries(data as [string, unknown][]);
 
-// Nested shape ["k", "i", ...] -> ["k"]: sums each array under a key.
-// Input is ["k", "i", "..."]: prefix match only.
-export const sumValues: Op<["k", "i", "..."], ["k"]> = (data) =>
+// Prefix match: ShapeOf derives a uniform-array-valued object as
+// ["k", "i"], which this open tail accepts.
+export const sumValues: Op<["k", "i", "..."], ["k"]> = (data: unknown) =>
   Object.fromEntries(
     Object.entries(data as Record<string, number[]>).map(([k, v]) => [
       k,
@@ -30,13 +26,11 @@ export const sumValues: Op<["k", "i", "..."], ["k"]> = (data) =>
     ]),
   );
 
-// Mixed-indexed ["i..."] -> ["i"]: strips keys, returns values only.
-export const flattenEntries: Op<["i..."], ["i"]> = (data) =>
+export const flattenEntries: Op<["i", "i..."], ["i"]> = (data: unknown) =>
   (data as [string, unknown][]).map(([, v]) => v);
 
-// Mixed-keyed ["k..."]: object whose values are non-uniform
-// (e.g. string/number/boolean). Stringifies all values to normalize.
-export const stringifyValues: Op<["k..."], ["k"]> = (data) =>
+// Object whose values are genuinely non-uniform (string/number/boolean).
+export const stringifyValues: Op<["k..."], ["k"]> = (data: unknown) =>
   Object.fromEntries(
     Object.entries(data as Record<string, unknown>).map(([k, v]) => [
       k,

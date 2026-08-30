@@ -126,7 +126,9 @@ function buildWrapper(
   };
 
   (wrapper as any).pipe = function (...fns: Array<(x: any) => any>) {
-    return compose(...(fns as [(x: any) => any]))(value);
+    return (
+      compose as (...fns: Array<(x: any) => any>) => (x: any) => any
+    )(...fns)(value);
   };
 
   (wrapper as any).compose = function (...fns: Array<(x: any) => any>) {
@@ -165,12 +167,25 @@ function buildDeferred(
   };
 
   (deferred as any).pipe = function (...fns: Array<(x: any) => any>) {
-    return buildDeferred([...steps, compose(...(fns as [(x: any) => any]))], ops);
+    return buildDeferred(
+      [
+        ...steps,
+        (compose as (...fns: Array<(x: any) => any>) => (x: any) => any)(
+          ...fns,
+        ),
+      ],
+      ops,
+    );
   };
 
   (deferred as any).compose = function (...fns: Array<(x: any) => any>) {
     return buildDeferred(
-      [...steps, compose(...(fns as [(x: any) => any]))],
+      [
+        ...steps,
+        (compose as (...fns: Array<(x: any) => any>) => (x: any) => any)(
+          ...fns,
+        ),
+      ],
       ops,
     );
   };

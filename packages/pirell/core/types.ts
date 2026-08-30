@@ -1,3 +1,5 @@
+import type { Check } from "./match.js";
+
 // --- Dim & Elem representation ---
 
 export type Dim = "i" | "k";
@@ -32,24 +34,24 @@ export interface Raw<S extends Shape> {
   readonly [__shapeBrand]?: S;
 }
 
-// Dual-form: data-first `op(data, ...args)` or curried
-// `op(...args)(data)` (data last). Fixed-arity Args only — dispatch by
-// arguments.length needs a known length (see op() in extend.ts).
+// Dual-form: data-first `op(data, ...args)` or curried `op(...args)(data)`.
+// Args=[] collapses to a plain signature; non-empty needs op()'s dispatcher.
 //
-// Args=[] collapses to one plain signature: nothing to curry, so a
-// plain function/arrow assigns directly, no factory needed. Non-empty
-// Args needs op()'s dispatcher — one function can't have two arities.
+// Data param is a gated generic (`D & Check<In, D>`), not `Raw<In>` —
+// data has no declared shape, ops derive it via ShapeOf and check
+// against In (see shape-inference.md). Impls need `(data: unknown)`
+// since the generic signature drops contextual typing.
 //
-// __in/__out anchor In/Out for TS to compare directly (no T/R value
-// channel). LOAD-BEARING: without them a wrong-shape Op passes silently.
+// __in/__out anchor In/Out for direct comparison — load-bearing, don't
+// remove (a wrong-shape Op would pass silently otherwise).
 export type Op<
   In extends Shape,
   Out extends Shape,
   Args extends any[] = [],
 > = ([Args] extends [[]]
-  ? (data: Raw<In>) => Raw<Out>
-  : ((data: Raw<In>, ...args: Args) => Raw<Out>) &
-      ((...args: Args) => (data: Raw<In>) => Raw<Out>)) & {
+  ? <D>(data: D & Check<In, D>) => Raw<Out>
+  : (<D>(data: D & Check<In, D>, ...args: Args) => Raw<Out>) &
+      ((...args: Args) => <D>(data: D & Check<In, D>) => Raw<Out>)) & {
   readonly __in?: In;
   readonly __out?: Out;
 };

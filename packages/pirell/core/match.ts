@@ -1,4 +1,12 @@
-import type { Branch, Dim, Elem, MixedTag, Shape, Variants } from "./types.js";
+import type {
+  Branch,
+  Dim,
+  Elem,
+  MixedTag,
+  Raw,
+  Shape,
+  Variants,
+} from "./types.js";
 
 // Shape-matching primitive. Depends only on the Shape vocabulary, not on
 // Op/Pirell/Wrapper/Deferred — any wiring pattern (fluent, pipe, custom)
@@ -51,3 +59,53 @@ type MatchesShape<In extends Shape, Actual extends Shape> = In extends []
 // match required.
 export type MatchesIn<In extends Shape, Actual extends Shape> =
   MatchesShape<In, Actual> extends true ? Actual : never;
+
+// --- Call-site shape inference (see shape-inference.md) ---
+//
+// ShapeOf<D> derives a Shape from a value's static type, so a bare
+// literal can be checked at the call site with no `as Raw<S>` cast.
+
+// True iff T is a genuine union (distributive-conditional trick: naked
+// T distributes over the union, so [U] extends [T] fails when T had >1
+// member).
+type IsUnion<T, U = T> = T extends U ? ([U] extends [T] ? false : true) : never;
+
+// Re-checks against Shape since _ShapeOf's recursion can't carry that
+// constraint itself; falls back to never if it ever misbehaves.
+export type ShapeOf<D> = _ShapeOf<D> extends Shape ? _ShapeOf<D> : never;
+
+// A container whose element type is a genuine union is heterogeneous
+// by construction — e.g. `[["a",1],["b",2]]` infers each row as
+// `(string|number)[]`, not a tuple, so that row is "i...". Structural
+// fact, not a reinterpretation — no exceptions per literal shape.
+type _ShapeOf<D> =
+  D extends Raw<infer S>
+    ? S
+    : D extends readonly (infer E)[]
+      ? IsUnion<E> extends true
+        ? ["i..."]
+        : ["i", ...ContainerTail<E>]
+      : D extends object
+        ? IsUnion<D[keyof D]> extends true
+          ? ["k..."]
+          : ["k", ...ContainerTail<D[keyof D]>]
+        : [];
+
+// Tail for the already-uniform case: leaf stops at [], container
+// recurses one level.
+type ContainerTail<E> = [unknown] extends [E]
+  ? []
+  : E extends readonly unknown[]
+    ? _ShapeOf<E>
+    : E extends object
+      ? _ShapeOf<E>
+      : [];
+
+// Must discriminate on the never sentinel itself ([X] extends [never]),
+// not X extends Shape — never extends Shape is true, which would
+// accept every call on failure.
+export type Check<In extends Shape, D> = [MatchesIn<In, ShapeOf<D>>] extends [
+  never,
+]
+  ? never
+  : unknown;
