@@ -5,9 +5,9 @@ import { pipe } from "./compose.js";
 import { double } from "./test-utils.js";
 
 describe("standalone extend()", () => {
-  it("applied directly, mirrors the .extend() method", () => {
+  it("applied directly, mirrors the .extend() method (Deferred)", () => {
     const chain = (extend({ double })(pirell()) as any).double();
-    const result = chain({ shape: ["i"], value: [1, 2, 3] });
+    const result = chain([1, 2, 3]);
     expect(result.value).toEqual([2, 4, 6]);
   });
 
@@ -18,14 +18,16 @@ describe("standalone extend()", () => {
     expect(result).toEqual([2, 4, 6]);
   });
 
-  it("accepts a single function", () => {
+  it("single function receives the raw value and yields the raw result", () => {
+    // extend(fn) unwraps a surface argument to its .value and returns
+    // whatever fn returns — raw JSON, no wrapper (raw-data ops contract).
     const result = extend(double)(pirell([1, 2, 3]));
-    expect(result.value).toEqual([2, 4, 6]);
+    expect(result).toEqual([2, 4, 6]);
   });
 
   it("single function works as a pipe step", () => {
     const fn = extend(double) as (x: any) => any;
     const result = pipe(pirell([1, 2, 3]), fn);
-    expect(result.value).toEqual([2, 4, 6]);
+    expect(result).toEqual([2, 4, 6]);
   });
 });

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { pirell } from "./assemble.js";
-import { compose } from "./compose.js";
-import { Wrapper } from "./pirell.js";
+import { pipe, compose } from "./compose.js";
+import type { Raw } from "./types.js";
 import {
   double,
   sumAll,
@@ -11,20 +11,18 @@ import {
   stringifyValues,
 } from "./test-utils.js";
 
-describe("Wrapper.extend (assembled)", () => {
-  it("wires a fluent method and rewraps the result", () => {
+describe("Wrapper.extend (data-bound)", () => {
+  it("wires a fluent method and returns a surface holding the raw result", () => {
     const ext = (pirell([1, 2, 3]) as any).extend({ double });
     const result = ext.double();
 
-    expect(result).toBeInstanceOf(Wrapper);
     expect(result.value).toEqual([2, 4, 6]);
   });
 
   it("works with object shape [Keyed, ...]", () => {
-    const ext = (pirell({ a: 1, b: 2 }) as any).extend({
-      toEntries,
-    });
-    const result = ext.toEntries();
+    const result = (pirell({ a: 1, b: 2 }) as any)
+      .extend({ toEntries })
+      .toEntries();
 
     expect(result.value).toEqual([
       ["a", 1],
@@ -33,27 +31,27 @@ describe("Wrapper.extend (assembled)", () => {
   });
 
   it("works with nested shape [Keyed, Indexed, ...]", () => {
-    const ext = (pirell({ a: [1, 2], b: [3, 4] }) as any).extend({
-      sumValues,
-    });
-    const result = ext.sumValues();
+    const result = (pirell({ a: [1, 2], b: [3, 4] }) as any)
+      .extend({ sumValues })
+      .sumValues();
 
     expect(result.value).toEqual({ a: 3, b: 7 });
   });
 
   it("chains extends on successive results", () => {
-    const ext1 = (pirell({ a: 1, b: 2 }) as any).extend({ toEntries });
-    const ext2 = ext1.toEntries().extend({ flattenEntries });
-    const result = ext2.flattenEntries();
+    const entries = (pirell({ a: 1, b: 2 }) as any)
+      .extend({ toEntries })
+      .toEntries();
+    const result = entries.extend({ flattenEntries }).flattenEntries();
 
     expect(result.value).toEqual([1, 2]);
   });
 });
 
-describe("Wrapper.pipe (assembled)", () => {
-  it("applies plain functions immediately and rewraps", () => {
+describe("Wrapper.pipe (data-bound)", () => {
+  it("applies plain functions immediately and returns the raw result", () => {
     const result = (pirell([1, 2, 3]) as any).pipe(double, sumAll);
-    expect(result.value).toBe(12); // (1+2+3)*2
+    expect(result).toBe(12); // (1+2+3)*2
   });
 
   it("pipes through shape transitions", () => {
@@ -62,14 +60,14 @@ describe("Wrapper.pipe (assembled)", () => {
       flattenEntries,
       double,
     );
-    expect(result.value).toEqual([2, 4]);
+    expect(result).toEqual([2, 4]);
   });
 });
 
-describe("Wrapper.compose (assembled)", () => {
-  it("applies plain functions immediately and rewraps", () => {
+describe("Wrapper.compose (data-bound)", () => {
+  it("applies plain functions immediately and returns the raw result", () => {
     const result = (pirell([1, 2, 3]) as any).compose(double, sumAll);
-    expect(result.value).toBe(12);
+    expect(result).toBe(12);
   });
 
   it("composes with shape transitions", () => {
@@ -79,19 +77,19 @@ describe("Wrapper.compose (assembled)", () => {
       flattenEntries,
       double,
     );
-    expect(result.value).toEqual([6, 14]);
+    expect(result).toEqual([6, 14]);
   });
 });
 
-describe("Deferred.extend (assembled)", () => {
-  it("builds a deferred, chainable, callable transform", () => {
+describe("Deferred (pirell()): builder surfaces", () => {
+  it("builds a fluent transform, callable with raw JSON", () => {
     const chain = (pirell() as any)
       .extend({ double })
       .double()
       .extend({ sumAll })
       .sumAll();
 
-    const result = chain(pirell([1, 2, 3]));
+    const result = chain([1, 2, 3]);
     expect(result.value).toBe(12); // (1+2+3)*2
   });
 
@@ -102,7 +100,7 @@ describe("Deferred.extend (assembled)", () => {
       .extend({ flattenEntries })
       .flattenEntries();
 
-    const result = chain(pirell({ a: 1, b: 2 }));
+    const result = chain({ a: 1, b: 2 });
     expect(result.value).toEqual([1, 2]);
   });
 
@@ -113,7 +111,7 @@ describe("Deferred.extend (assembled)", () => {
       .extend({ toEntries })
       .toEntries();
 
-    const result = chain(pirell({ a: [1, 2], b: [3, 4] }));
+    const result = chain({ a: [1, 2], b: [3, 4] });
     expect(result.value).toEqual([
       ["a", 3],
       ["b", 7],
@@ -121,53 +119,57 @@ describe("Deferred.extend (assembled)", () => {
   });
 });
 
-describe("Deferred.pipe (assembled)", () => {
-  it("applies steps and returns a result", () => {
+describe("Deferred.pipe / compose (lazy)", () => {
+  it("pipe builds a chain, callable with raw JSON", () => {
     const chain = (pirell() as any).pipe(double, sumAll);
 
-    const result = chain(pirell([1, 2, 3]));
+    const result = chain([1, 2, 3]);
     expect(result.value).toBe(12);
   });
 
-  it("pipes through shape transitions", () => {
+  it("pipe through shape transitions", () => {
     const chain = (pirell() as any).pipe(toEntries, flattenEntries, double);
 
-    const result = chain(pirell({ a: 1, b: 2 }));
+    const result = chain({ a: 1, b: 2 });
     expect(result.value).toEqual([2, 4]);
   });
 
-  it("composes as a plain step inside compose(), mixed with a custom op", () => {
-    const doubled: (data: any) => any = (pirell() as any)
-      .extend({ double })
-      .double();
-    const run = compose(doubled, sumAll);
+  it("compose builds a chain, callable with raw JSON", () => {
+    const chain = (pirell() as any).compose(double, sumAll);
 
-    const result = run(pirell([1, 2, 3]));
+    const result = chain([1, 2, 3]);
     expect(result.value).toBe(12);
+  });
+
+  it("compose with shape transitions", () => {
+    const chain = (pirell() as any).compose(toEntries, flattenEntries, double);
+
+    const result = chain({ a: 1, b: 2 });
+    expect(result.value).toEqual([2, 4]);
   });
 });
 
-describe("Deferred.compose (assembled)", () => {
-  it("applies steps and returns a result", () => {
-    const chain = (pirell() as any).compose(double, sumAll);
+describe("splitting a chain in two (value reuse)", () => {
+  it("one-line chain equals the split chain", () => {
+    const entry = (pirell() as any).extend({ double, sumAll });
 
-    const result = chain(pirell([1, 2, 3]));
-    expect(result.value).toBe(12);
-  });
+    const oneLine = entry([1, 2, 3]).double().sumAll();
 
-  it("composes with shape transitions", () => {
-    const chain = (pirell() as any).compose(toEntries, flattenEntries, double);
+    const res1 = entry([1, 2, 3]).double();
+    const split = entry(res1).sumAll();
 
-    const result = chain(pirell({ a: 1, b: 2 }));
-    expect(result.value).toEqual([2, 4]);
+    expect(oneLine.value).toBe(12);
+    expect(res1.value).toEqual([2, 4, 6]);
+    expect(split.value).toBe(12);
   });
 });
 
 describe("Keyed<unknown, 'mixed'> (non-uniform keyed nodes)", () => {
   it("Wrapper: accepts an object with non-uniform values via a mixed-keyed op", () => {
     const data = { name: "alice", age: 30, active: true };
-    const ext = (pirell(data) as any).extend({ stringifyValues });
-    const result = ext.stringifyValues();
+    const result = (pirell(data) as any)
+      .extend({ stringifyValues })
+      .stringifyValues();
 
     expect(result.value).toEqual({ name: "alice", age: "30", active: "true" });
   });
@@ -175,7 +177,7 @@ describe("Keyed<unknown, 'mixed'> (non-uniform keyed nodes)", () => {
   it("Deferred: pipes a mixed-keyed op over a non-uniform object", () => {
     const chain = (pirell() as any).pipe(stringifyValues);
 
-    const result = chain(pirell({ x: 1, y: "hello", z: false }));
+    const result = chain({ x: 1, y: "hello", z: false });
     expect(result.value).toEqual({ x: "1", y: "hello", z: "false" });
   });
 
@@ -186,6 +188,18 @@ describe("Keyed<unknown, 'mixed'> (non-uniform keyed nodes)", () => {
       flattenEntries,
     );
 
-    expect(result.value).toEqual(["42", "foo"]);
+    expect(result).toEqual(["42", "foo"]);
+  });
+});
+
+describe("standalone pipe/compose on raw data (no surface)", () => {
+  it("standalone pipe(data, fns) works directly on raw JSON", () => {
+    const result = pipe([1, 2, 3] as Raw<["i"]>, double, sumAll);
+    expect(result).toBe(12);
+  });
+
+  it("standalone compose(fns)(data) works directly on raw JSON", () => {
+    const result = compose(double, sumAll)([1, 2, 3] as Raw<["i"]>);
+    expect(result).toBe(12);
   });
 });
