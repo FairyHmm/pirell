@@ -24,27 +24,32 @@ export type Shape = Elem[] | [...Elem[], "..."];
 
 // --- Data / Op ---
 
-// Shape is compile-time only — value is untyped JSON data. data is
-// always JSON, and Shape is already a simplified top-down view of it
-// (see data-model.md), so a second value-type parameter would just
-// restate what the shape stack already describes; each Op narrows
-// data.value internally as needed. __shape is a phantom marker (see Op).
-export type Pirell<S extends Shape> = {
-  readonly __shape?: S;
-  value: unknown;
-};
+// Raw<S> is a branded phantom type: at runtime it IS the raw JSON value,
+// no wrapper. Interface (not `unknown & {brand}`) so it stays a real
+// structural check instead of collapsing to `unknown` and erasing S.
+declare const __shapeBrand: unique symbol;
+export interface Raw<S extends Shape> {
+  readonly [__shapeBrand]?: S;
+}
 
-// Op is phantom-typed: __in/__out anchor In/Out into a structural
-// position TS actually compares. No T/R — In/Out are the sole source
-// of truth, not a second value-type channel that could silently
-// disagree with the shape. LOAD-BEARING: removing __in/__out lets a
-// wrong-shape Op through with no error (verified) — every rejection
-// test in types.test.ts depends on them.
+// Dual-form: data-first `op(data, ...args)` or curried
+// `op(...args)(data)` (data last). Fixed-arity Args only — dispatch by
+// arguments.length needs a known length (see op() in extend.ts).
+//
+// Args=[] collapses to one plain signature: nothing to curry, so a
+// plain function/arrow assigns directly, no factory needed. Non-empty
+// Args needs op()'s dispatcher — one function can't have two arities.
+//
+// __in/__out anchor In/Out for TS to compare directly (no T/R value
+// channel). LOAD-BEARING: without them a wrong-shape Op passes silently.
 export type Op<
   In extends Shape,
   Out extends Shape,
   Args extends any[] = [],
-> = ((data: Pirell<In>, ...args: Args) => Pirell<Out>) & {
+> = ([Args] extends [[]]
+  ? (data: Raw<In>) => Raw<Out>
+  : ((data: Raw<In>, ...args: Args) => Raw<Out>) &
+      ((...args: Args) => (data: Raw<In>) => Raw<Out>)) & {
   readonly __in?: In;
   readonly __out?: Out;
 };
@@ -57,12 +62,14 @@ export type Fluent<F extends Op<any, any, any>> =
     : never;
 
 // Forward declaration to avoid circular dependency.
-// No runtime `shape` field — see Pirell above.
 export interface Wrapper<S extends Shape> {
   readonly __shape?: S;
   value: unknown;
 }
 
-export interface Deferred<In extends Shape, Out extends Shape> {
-  (data: Pirell<In>): Pirell<Out>;
+// A Deferred is a lazy raw-JSON transform. Calling it with raw data runs
+// its pipeline and returns a data-bound surface whose value has shape Out.
+// The input data is opaque JSON, so only the output shape is represented.
+export interface Deferred<Out extends Shape> {
+  (data: unknown): Wrapper<Out>;
 }
