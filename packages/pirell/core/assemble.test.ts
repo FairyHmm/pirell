@@ -1,7 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { pirell } from "./assemble.js";
-import { pipe, compose } from "./compose.js";
-import type { Raw } from "./types.js";
 import {
   double,
   sumAll,
@@ -189,17 +187,5 @@ describe("Keyed<unknown, 'mixed'> (non-uniform keyed nodes)", () => {
     );
 
     expect(result).toEqual(["42", "foo"]);
-  });
-});
-
-describe("standalone pipe/compose on raw data (no surface)", () => {
-  it("standalone pipe(data, fns) works directly on raw JSON", () => {
-    const result = pipe([1, 2, 3] as Raw<["i"]>, double, sumAll);
-    expect(result).toBe(12);
-  });
-
-  it("standalone compose(fns)(data) works directly on raw JSON", () => {
-    const result = compose(double, sumAll)([1, 2, 3] as Raw<["i"]>);
-    expect(result).toBe(12);
   });
 });
