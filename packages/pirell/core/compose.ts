@@ -22,8 +22,9 @@ type Apply<Cur, F> =
       : never;
 
 // Validate the remaining chain after the first fn, threading concrete output
-// value types forward. Each subsequent fn must accept the previous output.
-type Tail<Fns, Cur> = Fns extends [infer F, ...infer Rest]
+// value types forward. Exported for assemble.ts's fluent .pipe()/.compose()
+// to reuse directly (former PipeChain there was this same walk, twice).
+export type Tail<Fns, Cur> = Fns extends [infer F, ...infer Rest]
   ? Apply<Cur, F> extends never
     ? never
     : Apply<Cur, F> extends infer R
@@ -60,6 +61,9 @@ type FirstIn<Fns> = Fns extends [infer F, ...unknown[]]
     : never
   : never;
 
+// Plain-fn-only chain check — can't reuse Tail here: Op's __in/__out
+// markers are optional, so a bare function structurally matches
+// Op<any,any,any> too, and Tail would misfire into Apply's Op branch.
 export type ComposeFns<Fns extends unknown[], Acc> = Fns extends [
   (arg: Acc) => infer R,
   ...infer Rest,
@@ -86,7 +90,7 @@ export function compose(...fns: Array<(x: any) => any>): (x: any) => any {
 
 // Data-first: applies now instead of returning a func. Two overloads — an
 // Op-first chain shape-gates the data (bare literal, no cast); a plain
-// function chain keeps the older (arg: A) => R validation.
+// function chain uses ComposeFns/ComposeReturn (see ComposeFns's comment).
 export function pipe<D, Fns extends unknown[]>(
   data: D & Check<FirstIn<Fns>, D>,
   ...fns: Fns & ComposeChain<Fns>

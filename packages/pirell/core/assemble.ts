@@ -1,9 +1,16 @@
 import { pirell as rawPirell } from "./pirell.js";
-import type { Deferred, Dim, Fluent, Op, Raw, Shape, Wrapper } from "./types.js";
+import type {
+  Deferred,
+  Dim,
+  Fluent,
+  Op,
+  Raw,
+  Shape,
+  Wrapper,
+} from "./types.js";
 import type { MatchesIn } from "./match.js";
 import { wireOps } from "./extend.js";
-import { compose } from "./compose.js";
-import type { ComposeFns } from "./compose.js";
+import { compose, type Tail } from "./compose.js";
 
 // Single wiring point: primitives stay ignorant of each other.
 
@@ -25,25 +32,8 @@ type Reassembled<S, Shp extends Shape> =
       ? Assembled<Deferred<Shp>>
       : never;
 
-// Shape-checked chain typing for .pipe()/.compose(). Acc is Raw<Shape>
-// (phantom-branded), so op detection keys off Op<In,Out,Args> directly.
-export type PipeChain<Fns extends unknown[], Acc> = Fns extends [
-  (arg: Acc) => infer R,
-  ...infer Rest,
-]
-  ? Fns[0] extends Op<infer FIn, infer FOut, any>
-    ? MatchesIn<FIn, Extract<Acc, Shape>> extends Shape
-      ? Rest extends []
-        ? [(arg: Acc) => R]
-        : [(arg: Acc) => R, ...PipeChain<Rest, Raw<FOut>>]
-      : never
-    : Rest extends []
-      ? [(arg: Acc) => R]
-      : [(arg: Acc) => R, ...PipeChain<Rest, R>]
-  : never;
-
-// Reuse compose.ts's chain-checking for fluent .pipe()/.compose()
-// instead of erasing to untyped arrays.
+// Reuses compose.ts's Tail directly (former PipeChain here was the same
+// Op-detect-and-thread walk, twice).
 type Assembled<S> = S & {
   extend<K extends string, Op1 extends Op<any, any, any>>(
     ops: Op1 extends Op<infer In, any, any>
@@ -66,12 +56,12 @@ type Assembled<S> = S & {
     [K in keyof Ops]: Fluent<Ops[K] & Op<any, any, any>>;
   };
   pipe<Fns extends [(arg: CurrentData<S>) => any, ...Array<(arg: any) => any>]>(
-    ...fns: Fns & PipeChain<Fns, CurrentData<S>> & ComposeFns<Fns, CurrentData<S>>
+    ...fns: Fns & Tail<Fns, CurrentData<S>>
   ): S extends Wrapper<any> ? unknown : Assembled<S>;
   compose<
     Fns extends [(arg: CurrentData<S>) => any, ...Array<(arg: any) => any>],
   >(
-    ...fns: Fns & PipeChain<Fns, CurrentData<S>> & ComposeFns<Fns, CurrentData<S>>
+    ...fns: Fns & Tail<Fns, CurrentData<S>>
   ): S extends Wrapper<any> ? unknown : Assembled<S>;
 };
 
@@ -94,8 +84,7 @@ const isSurface = (x: unknown): boolean =>
   (typeof x === "function" || typeof x === "object") &&
   SURFACE in (x as any);
 
-const valueOf = (x: unknown): unknown =>
-  isSurface(x) ? (x as any).value : x;
+const valueOf = (x: unknown): unknown => (isSurface(x) ? (x as any).value : x);
 
 const runSteps = (
   steps: Array<(data: unknown) => unknown>,
@@ -103,10 +92,7 @@ const runSteps = (
 ): unknown => steps.reduce((acc, step) => step(acc), data);
 
 // Data-bound surface. `value` is the current raw JSON result.
-function buildWrapper(
-  value: unknown,
-  ops: OpMap,
-): Assembled<Wrapper<any>> {
+function buildWrapper(value: unknown, ops: OpMap): Assembled<Wrapper<any>> {
   const wrapper = ((input: unknown): Assembled<Wrapper<any>> => {
     // Re-enter: reuse another surface's value, or bind raw data as-is.
     return buildWrapper(valueOf(input), ops);
@@ -126,15 +112,15 @@ function buildWrapper(
   };
 
   (wrapper as any).pipe = function (...fns: Array<(x: any) => any>) {
-    return (
-      compose as (...fns: Array<(x: any) => any>) => (x: any) => any
-    )(...fns)(value);
+    return (compose as (...fns: Array<(x: any) => any>) => (x: any) => any)(
+      ...fns,
+    )(value);
   };
 
   (wrapper as any).compose = function (...fns: Array<(x: any) => any>) {
-    return (
-      compose as (...fns: Array<(x: any) => any>) => (x: any) => any
-    )(...fns)(value);
+    return (compose as (...fns: Array<(x: any) => any>) => (x: any) => any)(
+      ...fns,
+    )(value);
   };
 
   return wrapper;
@@ -158,7 +144,8 @@ function buildDeferred(
   });
 
   wireOps(deferred, ops, (op, args) => {
-    const step = (data: unknown) => (op as (...a: any[]) => unknown)(data, ...args);
+    const step = (data: unknown) =>
+      (op as (...a: any[]) => unknown)(data, ...args);
     return buildDeferred([...steps, step], ops);
   });
 
