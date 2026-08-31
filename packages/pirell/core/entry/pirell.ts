@@ -1,4 +1,4 @@
-import type { Dim } from "./types.js";
+import type { Dim } from "../types/types.js";
 
 // Bare data-bound surface: value only, untyped (shape is a compile-time claim).
 export class Wrapper<S> {

@@ -1,4 +1,4 @@
-import type { Op, Shape } from "./types.js";
+import type { Op, Shape } from "../types/types.js";
 
 // Fixed-arity dual-form Op: arity is impl.length - 1, so impl needs named
 // params, not rest/default.

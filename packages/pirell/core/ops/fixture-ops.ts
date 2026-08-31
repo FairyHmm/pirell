@@ -1,4 +1,4 @@
-import type { Op } from "./types.js";
+import type { Op } from "../types/types.js";
 import { op } from "./op.js";
 
 // data: unknown required — Op's generic signature drops contextual typing

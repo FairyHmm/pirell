@@ -1,4 +1,4 @@
-import type { Op } from "./types.js";
+import type { Op } from "../types/types.js";
 import { isSurface, valueOf } from "./surface.js";
 
 // Registers ops by name only; shape-checking lives at the Op signature

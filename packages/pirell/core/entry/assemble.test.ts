@@ -7,7 +7,7 @@ import {
   sumValues,
   flattenEntries,
   stringifyValues,
-} from "./fixture-ops.js";
+} from "../ops/fixture-ops.js";
 
 describe("Deferred.value typing", () => {
   it("is always undefined, at both runtime and type level", () => {

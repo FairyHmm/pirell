@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 // Import ONLY from the public entry — the point is that a user can
 // recreate the library (define their own composable ops and assemble a
 // surface) using nothing but the exported API.
-import { op, extend, pirell } from "./index.js";
+import { op, extend, pirell } from "../index.js";
 
 // A user-defined, dual-form (data-first or curried) op, via public `op()`.
 // groupBy partitions an indexed collection of keyed rows (['i','k',...]).

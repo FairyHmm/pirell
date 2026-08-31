@@ -1,6 +1,14 @@
 import { pirell as rawPirell } from "./pirell.js";
-import type { Bound, Deferred, Dim, Fluent, Op, Raw, Shape } from "./types.js";
-import type { MatchesIn } from "./match.js";
+import type {
+  Bound,
+  Deferred,
+  Dim,
+  Fluent,
+  Op,
+  Raw,
+  Shape,
+} from "../types/types.js";
+import type { MatchesIn } from "../types/match.js";
 import { wireOps } from "./extend.js";
 import { compose, type Tail } from "./compose.js";
 import { SURFACE, isSurface, valueOf } from "./surface.js";

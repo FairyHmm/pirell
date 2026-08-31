@@ -1,5 +1,5 @@
-import type { Op, Raw, Shape } from "./types.js";
-import type { Check, MatchesIn, ShapeOf } from "./match.js";
+import type { Op, Raw, Shape } from "../types/types.js";
+import type { Check, MatchesIn, ShapeOf } from "../types/match.js";
 
 // Function composition, usable with Ops or plain unary fns, shape-checked
 // at compile time.

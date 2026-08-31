@@ -6,7 +6,7 @@ import type {
   Raw,
   Shape,
   Variants,
-} from "./types.js";
+} from "./types.js"; // same-dir, unchanged
 
 // Shape-matching primitive, independent of any wiring pattern. Any
 // non-Op engine can check a Shape against another Shape (type-representation.md).
