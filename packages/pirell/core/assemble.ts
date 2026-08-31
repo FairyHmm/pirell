@@ -34,6 +34,22 @@ type Reassembled<S, Shp extends Shape> =
 
 // Reuses compose.ts's Tail directly (former PipeChain here was the same
 // Op-detect-and-thread walk, twice).
+//
+// The runtime surface (below) is a plain callable function with methods
+// attached via Object.defineProperty, cast to this type at its two
+// construction points (`as unknown as Assembled<...>`). That's a
+// deliberate, permanent boundary, not a gap to close: getting real
+// inference through a dynamically-built function object would mean
+// either rebuilding the surface per call with the narrowed generic
+// baked in (breaks the "one function, no rebuild" runtime model) or a
+// code-gen/proxy-based surface (a different assembly mechanism
+// entirely). Two visible costs of this boundary, both accepted:
+// `.pipe()`/`.compose()` on a Bound surface type as `unknown` rather
+// than the real result type (tests use `as any` there on purpose, not
+// as a workaround for a defect — see fixtures/assemble tests), and the
+// runtime `compose` calls inside buildWrapper/buildDeferred are cast to
+// `(...fns: Array<(x:any)=>any>) => ...`, discarding compose.ts's
+// ComposeChain/Tail typing rather than reusing it.
 type Assembled<S> = S & {
   extend<K extends string, Op1 extends Op<any, any, any>>(
     ops: Op1 extends Op<infer In, any, any>

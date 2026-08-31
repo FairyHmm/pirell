@@ -31,6 +31,18 @@ type Normalize<E extends Elem> = E extends Dim
 
 // Whether an In element matches an Actual element at the same position:
 // both sides normalized, then compared by mutual `extends`.
+//
+// This is structural equality on Normalize's output, not on Elem itself.
+// It's correct for every Elem form that exists today (Dim, MixedTag,
+// [Dim,Branch], [MixedTag,Variants]) because no two of them currently
+// normalize to the same { dim, uniform } shape for the same Dim. Before
+// adding a new Elem arm, check whether its Normalize output could
+// coincide with an existing arm's { dim, uniform } for the same Dim —
+// if it can, ElemMatches will silently accept the new form as equal to
+// the existing one. See BUGS.md / archive/BUGS-fixed.md for the
+// specific case this was flagged against (In "i" vs Actual ["i",
+// number] — currently rejected because "leaf" doesn't extend number,
+// but a future arm designed to reuse the "leaf" tag would slip through).
 type ElemMatches<InE extends Elem, ActualE extends Elem> =
   Normalize<ActualE> extends Normalize<InE>
     ? Normalize<InE> extends Normalize<ActualE>
