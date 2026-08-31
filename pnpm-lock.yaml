@@ -10,9 +10,9 @@ importers:
 
   packages/bundlers:
     dependencies:
-      pirell:
+      '@pirell/core':
         specifier: workspace:*
-        version: link:../pirell
+        version: link:../pirell/core
     devDependencies:
       esbuild:
         specifier: ^0.28.2
@@ -30,7 +30,39 @@ importers:
         specifier: ^7.2.2
         version: 7.2.2(webpack@5.109.2)
 
-  packages/pirell:
+  packages/pirell/core:
+    devDependencies:
+      tsdown:
+        specifier: ^0.22.14
+        version: 0.22.14(typescript@7.0.2)
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@26.2.0)(vite@8.2.2(@types/node@26.2.0)(esbuild@0.28.2)(terser@5.50.0))
+
+  packages/pirell/group:
+    dependencies:
+      '@pirell/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      tsdown:
+        specifier: ^0.22.14
+        version: 0.22.14(typescript@7.0.2)
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@26.2.0)(vite@8.2.2(@types/node@26.2.0)(esbuild@0.28.2)(terser@5.50.0))
+
+  packages/pirell/relational:
+    dependencies:
+      '@pirell/core':
+        specifier: workspace:*
+        version: link:../core
     devDependencies:
       tsdown:
         specifier: ^0.22.14

@@ -1,0 +1,38 @@
+{
+  "name": "@pirell/relational",
+  "author": "Fairy",
+  "version": "0.1.0",
+  "description": "Relational transformations including table and aggregate operations.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "license": "ISC",
+  "keywords": [
+    "data",
+    "relational",
+    "table",
+    "aggregate",
+    "typescript"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@pirell/core": "workspace:*"
+  },
+  "devDependencies": {
+    "tsdown": "^0.22.14",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  }
+}

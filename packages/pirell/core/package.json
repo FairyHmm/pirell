@@ -1,8 +1,8 @@
 {
-  "name": "pirell",
+  "name": "@pirell/core",
   "author": "Fairy",
   "version": "0.1.0",
-  "description": "Lightweight pipeline-based relational utilities for native JS arrays.",
+  "description": "Shape-aware pipeline engine that composes type-checked transformations over raw JavaScript data.",
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -15,13 +15,12 @@
   "license": "ISC",
   "keywords": [
     "data",
-    "relational",
-    "dimensional",
-    "array-utils",
-    "pipe",
-    "fluent",
+    "pipeline",
+    "transform",
     "functional",
-    "typescript"
+    "typescript",
+    "fluent",
+    "shape"
   ],
   "engines": {
     "node": ">=18.0.0"

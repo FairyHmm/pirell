@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json.schemastore.org/tsconfig",
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
@@ -8,14 +9,6 @@
     "strict": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "noUncheckedIndexedAccess": true,
-    "outDir": "./dist",
-    "rootDir": ".",
-  },
-  "include": [
-    "index.ts",
-    "core/**/*.ts",
-    "relational/**/*.ts",
-    "sugar/**/*.ts",
-  ],
+    "noUncheckedIndexedAccess": true
+  }
 }

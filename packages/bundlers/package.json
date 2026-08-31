@@ -14,7 +14,7 @@
     "build": "echo \"TODO: run all bundler builds\""
   },
   "dependencies": {
-    "pirell": "workspace:*"
+    "@pirell/core": "workspace:*"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",

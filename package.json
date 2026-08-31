@@ -5,9 +5,9 @@
   "description": "Monorepo for the Pirell library and showcase site.",
   "license": "ISC",
   "scripts": {
-    "build": "pnpm -F pirell build",
-    "test": "pnpm -F pirell test",
-    "typecheck": "pnpm -F pirell typecheck"
+    "build": "pnpm -r --filter './packages/pirell/*' build",
+    "test": "pnpm -r --filter './packages/pirell/*' test",
+    "typecheck": "pnpm -r --filter './packages/pirell/*' typecheck"
   },
   "engines": {
     "node": ">=18.0.0"

@@ -1,5 +1,6 @@
 packages:
   - "packages/*"
+  - "packages/pirell/*"
   - "site"
 allowBuilds:
   esbuild: set this to true or false
