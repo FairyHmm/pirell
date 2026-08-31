@@ -1,4 +1,5 @@
 import type { Op } from "./types.js";
+import { op } from "./op.js";
 
 // `data: unknown` is required — Op's generic call signature (see
 // types.ts/shape-inference.md) doesn't contextually type plain arrows.
@@ -37,3 +38,11 @@ export const stringifyValues: Op<["k..."], ["k"]> = (data: unknown) =>
       String(v),
     ]),
   );
+
+// Non-empty-Args exercise for op()'s dual-form dispatcher (see BUGS.md
+// #8 / archive/BUGS-fixed.md): data-first `nth(data, i)` or curried
+// `nth(i)(data)`. `impl.length` (2) minus the data param gives arity 1,
+// so op() dispatches on `callArgs.length === 1` to pick curried form.
+export const nth: Op<["i"], [], [number]> = op(
+  (data: unknown, i: number) => (data as unknown[])[i],
+);

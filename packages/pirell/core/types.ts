@@ -75,6 +75,10 @@ export interface Bound<S extends Shape> {
 // A Deferred is a lazy raw-JSON transform. Calling it with raw data runs
 // its pipeline and returns a data-bound surface whose value has shape Out.
 // The input data is opaque JSON, so only the output shape is represented.
+// `value` is always `undefined` at the type level too, matching the
+// runtime getter in assemble.ts — a Deferred has no bound data yet, so
+// unlike Bound.value (unknown), this isn't an info gap to widen later.
 export interface Deferred<Out extends Shape> {
   (data: unknown): Bound<Out>;
+  readonly value: undefined;
 }

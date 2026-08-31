@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, expectTypeOf } from "vitest";
 import { pirell } from "./assemble.js";
 import {
   double,
@@ -8,6 +8,14 @@ import {
   flattenEntries,
   stringifyValues,
 } from "./fixture-ops.js";
+
+describe("Deferred.value typing", () => {
+  it("is always undefined, at both runtime and type level", () => {
+    const deferred = pirell();
+    expect(deferred.value).toBeUndefined();
+    expectTypeOf(deferred.value).toEqualTypeOf<undefined>();
+  });
+});
 
 describe("Wrapper.extend (data-bound)", () => {
   it("wires a fluent method and returns a surface holding the raw result", () => {

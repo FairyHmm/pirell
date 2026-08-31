@@ -5,6 +5,7 @@ import {
   sumValues,
   toEntries,
   entriesToObject,
+  nth,
 } from "./fixture-ops.js";
 
 // Head-node literals go bare (no cast) — ShapeOf derives shape
@@ -83,6 +84,44 @@ describe("type inference through chains", () => {
     const values = flattenEntries(pairs);
     const doubled = double(values);
     expect(doubled).toEqual([10, 20]);
+  });
+});
+
+// op()'s dual-form dispatcher (non-empty Args), exercised via `nth`.
+// See BUGS.md #8 / archive/BUGS-fixed.md for why this needed coverage.
+describe("op() dual-form dispatch (non-empty Args)", () => {
+  it("data-first: nth(data, i) applies immediately", () => {
+    const result = nth([10, 20, 30], 1);
+    expect(result).toBe(20);
+  });
+
+  it("curried: nth(i)(data) applies once data arrives", () => {
+    const result = nth(1)([10, 20, 30]);
+    expect(result).toBe(20);
+  });
+
+  it("curried form is reusable across different data", () => {
+    const second = nth(2);
+    expect(second([10, 20, 30])).toBe(30);
+    expect(second(["a", "b", "c"])).toBe("c");
+  });
+
+  it("rejects wrong-shape data in data-first form", () => {
+    // Type check only — never runs
+    if (false) {
+      const obj = { a: 1 };
+      // @ts-expect-error -- nth expects ["i"], not ["k"]
+      nth(obj, 0);
+    }
+  });
+
+  it("rejects wrong-shape data in curried form", () => {
+    // Type check only — never runs
+    if (false) {
+      const obj = { a: 1 };
+      // @ts-expect-error -- nth expects ["i"], not ["k"]
+      nth(0)(obj);
+    }
   });
 });
 
