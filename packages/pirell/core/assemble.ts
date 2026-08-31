@@ -1,12 +1,12 @@
 import { pirell as rawPirell } from "./pirell.js";
 import type {
+  Bound,
   Deferred,
   Dim,
   Fluent,
   Op,
   Raw,
   Shape,
-  Wrapper,
 } from "./types.js";
 import type { MatchesIn } from "./match.js";
 import { wireOps } from "./extend.js";
@@ -16,9 +16,9 @@ import { compose, type Tail } from "./compose.js";
 
 type OpMap = Record<string, Op<any, any, any>>;
 
-// Unified output type: Wrapper and Deferred both resolve to what the next op sees.
+// Unified output type: Bound and Deferred both resolve to what the next op sees.
 type CurrentData<S> =
-  S extends Wrapper<infer Shp extends Shape>
+  S extends Bound<infer Shp extends Shape>
     ? Raw<Shp>
     : S extends Deferred<infer Out extends Shape>
       ? Raw<Out>
@@ -26,8 +26,8 @@ type CurrentData<S> =
 
 // Retypes the surface after an op to reflect the new output shape.
 type Reassembled<S, Shp extends Shape> =
-  S extends Wrapper<any>
-    ? Assembled<Wrapper<Shp>>
+  S extends Bound<any>
+    ? Assembled<Bound<Shp>>
     : S extends Deferred<any>
       ? Assembled<Deferred<Shp>>
       : never;
@@ -57,12 +57,12 @@ type Assembled<S> = S & {
   };
   pipe<Fns extends [(arg: CurrentData<S>) => any, ...Array<(arg: any) => any>]>(
     ...fns: Fns & Tail<Fns, CurrentData<S>>
-  ): S extends Wrapper<any> ? unknown : Assembled<S>;
+  ): S extends Bound<any> ? unknown : Assembled<S>;
   compose<
     Fns extends [(arg: CurrentData<S>) => any, ...Array<(arg: any) => any>],
   >(
     ...fns: Fns & Tail<Fns, CurrentData<S>>
-  ): S extends Wrapper<any> ? unknown : Assembled<S>;
+  ): S extends Bound<any> ? unknown : Assembled<S>;
 };
 
 // --- Runtime surface builder ---
@@ -92,11 +92,11 @@ const runSteps = (
 ): unknown => steps.reduce((acc, step) => step(acc), data);
 
 // Data-bound surface. `value` is the current raw JSON result.
-function buildWrapper(value: unknown, ops: OpMap): Assembled<Wrapper<any>> {
-  const wrapper = ((input: unknown): Assembled<Wrapper<any>> => {
+function buildWrapper(value: unknown, ops: OpMap): Assembled<Bound<any>> {
+  const wrapper = ((input: unknown): Assembled<Bound<any>> => {
     // Re-enter: reuse another surface's value, or bind raw data as-is.
     return buildWrapper(valueOf(input), ops);
-  }) as unknown as Assembled<Wrapper<any>>;
+  }) as unknown as Assembled<Bound<any>>;
 
   Object.defineProperty(wrapper, SURFACE, { value: true });
   Object.defineProperty(wrapper, "value", {
@@ -131,7 +131,7 @@ function buildDeferred(
   steps: Array<(data: unknown) => unknown>,
   ops: OpMap,
 ): Assembled<Deferred<any>> {
-  const deferred = ((input: unknown): Assembled<Wrapper<any>> => {
+  const deferred = ((input: unknown): Assembled<Bound<any>> => {
     if (isSurface(input)) {
       return buildWrapper(valueOf(input), ops);
     }
@@ -180,8 +180,8 @@ function buildDeferred(
   return deferred;
 }
 
-// pirell(data) → data-bound Wrapper; pirell() → Deferred builder
-export function pirell(data: unknown): Assembled<Wrapper<Dim[]>>;
+// pirell(data) → data-bound surface (Bound); pirell() → Deferred builder
+export function pirell(data: unknown): Assembled<Bound<Dim[]>>;
 export function pirell(): Assembled<Deferred<[]>>;
 export function pirell(...args: [unknown] | []): unknown {
   if (args.length === 0) {

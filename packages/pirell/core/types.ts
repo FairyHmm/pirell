@@ -60,11 +60,14 @@ export type Op<
 // then narrows on each .extend() so pre-call shape no longer matches.
 export type Fluent<F extends Op<any, any, any>> =
   F extends Op<any, infer Out, infer Args>
-    ? (...args: Args) => Wrapper<Out>
+    ? (...args: Args) => Bound<Out>
     : never;
 
-// Forward declaration to avoid circular dependency.
-export interface Wrapper<S extends Shape> {
+// Type-level tag for a data-bound surface (assemble.ts's runtime Wrapper
+// class is a distinct, unrelated type — this is a forward declaration to
+// avoid a circular dependency, named Bound rather than Wrapper so the two
+// don't collide under one name; see BUGS.md #1).
+export interface Bound<S extends Shape> {
   readonly __shape?: S;
   value: unknown;
 }
@@ -73,5 +76,5 @@ export interface Wrapper<S extends Shape> {
 // its pipeline and returns a data-bound surface whose value has shape Out.
 // The input data is opaque JSON, so only the output shape is represented.
 export interface Deferred<Out extends Shape> {
-  (data: unknown): Wrapper<Out>;
+  (data: unknown): Bound<Out>;
 }
