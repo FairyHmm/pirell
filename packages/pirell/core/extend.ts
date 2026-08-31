@@ -1,4 +1,5 @@
 import type { Op } from "./types.js";
+import { isSurface, valueOf } from "./surface.js";
 
 // Registers ops by name only; shape-checking lives at the Op signature
 // and in assemble.ts's chain typing.
@@ -30,13 +31,9 @@ export function extend(surfaceOrOps: any, ops?: any): any {
     // Unwrap a surface to its raw value before calling fn; a bare value
     // passes through. Both typeof checks matter (surfaces are callable fns).
     return (surfaceOrValue: any) => {
-      const raw =
-        surfaceOrValue != null &&
-        (typeof surfaceOrValue === "object" ||
-          typeof surfaceOrValue === "function") &&
-        "value" in surfaceOrValue
-          ? surfaceOrValue.value
-          : surfaceOrValue;
+      const raw = isSurface(surfaceOrValue)
+        ? valueOf(surfaceOrValue)
+        : surfaceOrValue;
       return surfaceOrOps(raw);
     };
   }

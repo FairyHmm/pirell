@@ -3,6 +3,7 @@ import type { Bound, Deferred, Dim, Fluent, Op, Raw, Shape } from "./types.js";
 import type { MatchesIn } from "./match.js";
 import { wireOps } from "./extend.js";
 import { compose, type Tail } from "./compose.js";
+import { SURFACE, isSurface, valueOf } from "./surface.js";
 
 // Single wiring point: primitives stay ignorant of each other.
 
@@ -63,15 +64,6 @@ type Assembled<S> = S & {
 // Both surface kinds are callable (composition.md): a Deferred appends
 // steps lazily until data arrives; a Wrapper applies them immediately.
 // Callability lets a bound Wrapper feed back as input, reusing its value.
-
-const SURFACE = "__pirell";
-
-const isSurface = (x: unknown): boolean =>
-  x != null &&
-  (typeof x === "function" || typeof x === "object") &&
-  SURFACE in (x as any);
-
-const valueOf = (x: unknown): unknown => (isSurface(x) ? (x as any).value : x);
 
 const runSteps = (
   steps: Array<(data: unknown) => unknown>,
