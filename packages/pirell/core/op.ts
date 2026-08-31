@@ -1,7 +1,6 @@
 import type { Op, Shape } from "./types.js";
 
-// Builds a fixed-arity dual-form Op (data-first or curried). Needed only
-// when Args is non-empty — arity is impl.length - 1, so impl needs named
+// Fixed-arity dual-form Op: arity is impl.length - 1, so impl needs named
 // params, not rest/default.
 export function op<
   In extends Shape,

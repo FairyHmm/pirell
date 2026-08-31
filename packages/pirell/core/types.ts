@@ -4,18 +4,16 @@ import type { Check } from "./match.js";
 
 export type Dim = "i" | "k";
 
-// Branch: nested Shape, leaf type, or object — `unknown` deliberately
-// excluded because it absorbs unions and collapses comparisons.
+// Branch: nested Shape, leaf type, or object — `unknown` excluded because it
+// absorbs unions and collapses comparisons.
 export type Branch =
   Shape | (string & {}) | (number & {}) | (boolean & {}) | object;
 
-// Positional/named variant forms for a Mixed node's children.
-// Array vs. object is JSON's own fork — kept as a union, not force-unified.
+// Positional/named variant forms for a Mixed node's children; array vs.
+// object is JSON's own fork, kept as a union rather than force-unified.
 export type Variants = Branch[] | Record<string, Branch>;
 
-// MixedTag derives from Dim rather than being a second hand-written
-// literal union: "i..."/"k..." is just Dim + "this node has
-// heterogeneous children", not an independent concept.
+// MixedTag derives from Dim: "i..."/"k..." is just Dim + "heterogeneous children".
 export type MixedTag = `${Dim}...`;
 
 // Elem: dim, mixed tag, or a [dim, Branch] / [mixedTag, variants] pair.
@@ -26,24 +24,17 @@ export type Shape = Elem[] | [...Elem[], "..."];
 
 // --- Data / Op ---
 
-// Raw<S> is a branded phantom type: at runtime it IS the raw JSON value,
-// no wrapper. Interface (not `unknown & {brand}`) so it stays a real
-// structural check instead of collapsing to `unknown` and erasing S.
+// Raw<S> is a branded phantom: at runtime it IS the raw JSON value, no
+// wrapper. Interface (not `unknown & {brand}`) to stay a real structural
+// check instead of collapsing to `unknown` and erasing S.
 declare const __shapeBrand: unique symbol;
 export interface Raw<S extends Shape> {
   readonly [__shapeBrand]?: S;
 }
 
-// Dual-form: data-first `op(data, ...args)` or curried `op(...args)(data)`.
-// Args=[] collapses to a plain signature; non-empty needs op()'s dispatcher.
-//
-// Data param is a gated generic (`D & Check<In, D>`), not `Raw<In>` —
-// data has no declared shape, ops derive it via ShapeOf and check
-// against In (see shape-inference.md). Impls need `(data: unknown)`
-// since the generic signature drops contextual typing.
-//
-// __in/__out anchor In/Out for direct comparison — load-bearing, don't
-// remove (a wrong-shape Op would pass silently otherwise).
+// Dual-form Op (data-first or curried). Data is a gated generic rather
+// than Raw<In> — data has no declared shape, ops derive it (see
+// shape-inference.md). __in/__out anchor In/Out for comparison — load-bearing.
 export type Op<
   In extends Shape,
   Out extends Shape,
@@ -56,28 +47,24 @@ export type Op<
   readonly __out?: Out;
 };
 
-// Not `this`-typed: method closes over op at attach time,
-// then narrows on each .extend() so pre-call shape no longer matches.
+// Not `this`-typed: closes over the op at attach time, then narrows on each
+// .extend() so the pre-call shape no longer matches.
 export type Fluent<F extends Op<any, any, any>> =
   F extends Op<any, infer Out, infer Args>
     ? (...args: Args) => Bound<Out>
     : never;
 
-// Type-level tag for a data-bound surface (assemble.ts's runtime Wrapper
-// class is a distinct, unrelated type — this is a forward declaration to
-// avoid a circular dependency, named Bound rather than Wrapper so the two
-// don't collide under one name; see BUGS.md #1).
+// Type-level tag for a data-bound surface. Forward-declared here to avoid
+// a circular dependency; named Bound (not Wrapper) so it doesn't collide
+// with the runtime class of the same concept (see type-safety.md).
 export interface Bound<S extends Shape> {
   readonly __shape?: S;
   value: unknown;
 }
 
-// A Deferred is a lazy raw-JSON transform. Calling it with raw data runs
-// its pipeline and returns a data-bound surface whose value has shape Out.
-// The input data is opaque JSON, so only the output shape is represented.
-// `value` is always `undefined` at the type level too, matching the
-// runtime getter in assemble.ts — a Deferred has no bound data yet, so
-// unlike Bound.value (unknown), this isn't an info gap to widen later.
+// A Deferred is a lazy raw-JSON transform: calling it runs the pipeline
+// on opaque input and returns a data-bound surface of shape Out. value is
+// typed undefined (matching assemble.ts) since no data is bound yet.
 export interface Deferred<Out extends Shape> {
   (data: unknown): Bound<Out>;
   readonly value: undefined;

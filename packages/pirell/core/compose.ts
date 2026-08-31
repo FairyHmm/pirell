@@ -1,17 +1,14 @@
 import type { Op, Raw, Shape } from "./types.js";
 import type { Check, MatchesIn, ShapeOf } from "./match.js";
 
-// Function-composition utility. Also usable with pirell Ops: a chain may be a
-// mix of Ops and plain unary functions, shape-checked at compile time.
+// Function composition, usable with Ops or plain unary fns, shape-checked
+// at compile time.
 
-// Shape a value carries at the current position: from a Raw<Shape> phantom
-// directly, otherwise derived structurally from the value's static type.
+// Shape a value carries at the current position (Raw<S> phantom, else structural).
 type ShapeOfCur<Cur> =
   Cur extends Raw<infer S extends Shape> ? S : ShapeOf<Cur> & Shape;
 
-// Apply fn F to the current value type Cur; yields F's output value type, or
-// never if a shape/link mismatch. An Op is detected structurally; a plain
-// function is matched by (arg: Cur) => R.
+// Apply fn F to Cur: F's output value type, or never on shape/link mismatch.
 type Apply<Cur, F> =
   F extends Op<infer FIn, infer FOut, any>
     ? [MatchesIn<FIn, ShapeOfCur<Cur>>] extends [never]
@@ -21,9 +18,8 @@ type Apply<Cur, F> =
       ? R
       : never;
 
-// Validate the remaining chain after the first fn, threading concrete output
-// value types forward. Exported for assemble.ts's fluent .pipe()/.compose()
-// to reuse directly (former PipeChain there was this same walk, twice).
+// Thread concrete output value types forward; reused by assemble.ts's fluent
+// .pipe()/.compose().
 export type Tail<Fns, Cur> = Fns extends [infer F, ...infer Rest]
   ? Apply<Cur, F> extends never
     ? never
@@ -34,8 +30,8 @@ export type Tail<Fns, Cur> = Fns extends [infer F, ...infer Rest]
       : never
   : [];
 
-// Compose-form chain: the first element's input derives from its OWN signature
-// (compose has no data), so it is never checked against anything.
+// Compose's first element input derives from its own signature (no data),
+// so it's unchecked.
 type ComposeChain<Fns> = Fns extends [infer F, ...infer Rest]
   ? F extends Op<infer FIn, infer FOut, any>
     ? [(arg: Raw<FIn>) => Raw<FOut>, ...Tail<Rest, Raw<FOut>>]
@@ -46,21 +42,19 @@ type ComposeChain<Fns> = Fns extends [infer F, ...infer Rest]
       : never
   : never;
 
-// Result value type of a composed chain (last fn's output). Shared by both
-// compose's and pipe's Op-first overload below.
+// Last fn's output — shared by compose's and pipe's Op-first overloads.
 type ComposeResult<Fns> =
   ComposeChain<Fns> extends [...unknown[], (arg: any) => infer R] ? R : never;
 
-// First fn's In claim if the chain starts with an Op, else never.
+// First fn's In if the chain starts with an Op, else never.
 type FirstIn<Fns> = Fns extends [infer F, ...unknown[]]
   ? F extends Op<infer I, any, any>
     ? I
     : never
   : never;
 
-// Plain-fn-only chain check — can't reuse Tail here: Op's __in/__out
-// markers are optional, so a bare function structurally matches
-// Op<any,any,any> too, and Tail would misfire into Apply's Op branch.
+// Plain-fn-only chain: bare fns structurally match Op<any,any,any>, so Tail
+// would misfire into Apply's Op branch.
 export type ComposeFns<Fns extends unknown[], Acc> = Fns extends [
   (arg: Acc) => infer R,
   ...infer Rest,
@@ -77,7 +71,7 @@ export type ComposeReturn<Fns extends unknown[]> = Fns extends [
   ? R
   : never;
 
-// Returns a plain function, applies nothing until called.
+// Deferred: returns a function, applies nothing until called.
 export function compose<Fns extends unknown[]>(
   ...fns: Fns & ComposeChain<Fns>
 ): (
@@ -89,9 +83,8 @@ export function compose(...fns: Array<(x: any) => any>): (x: any) => any {
   return (x: any) => fns.reduce((acc, fn) => fn(acc), x);
 }
 
-// Data-first: applies now instead of returning a func. Two overloads — an
-// Op-first chain shape-gates the data (bare literal, no cast); a plain
-// function chain uses ComposeFns/ComposeReturn (see ComposeFns's comment).
+// Data-first: applies now. Op-first overload shape-gates the data (bare
+// literal, no cast); a plain chain uses ComposeFns/ComposeReturn.
 export function pipe<D, Fns extends unknown[]>(
   data: D & Check<FirstIn<Fns>, D>,
   ...fns: Fns & ComposeChain<Fns>

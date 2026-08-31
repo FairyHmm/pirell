@@ -8,17 +8,15 @@ import type {
   Variants,
 } from "./types.js";
 
-// Shape-matching primitive. Depends only on the Shape vocabulary, not on
-// Op/Pirell/Wrapper/Deferred — any wiring pattern (fluent, pipe, custom)
-// can check a Shape against another Shape without adopting assemble.ts.
+// Shape-matching primitive, independent of any wiring pattern. Any
+// non-Op engine can check a Shape against another Shape (type-representation.md).
 
 type DimOf<T extends MixedTag> = T extends `${infer D extends Dim}...`
   ? D
   : never;
 
 // Canonical form for comparison: each Elem reduces to { dim, uniform }.
-// "i"/"k" → leaf, "i..."/"k..." → mixed, [dim, Branch] → typed uniform,
-// [mixedTag, variants] → typed mixed. "i" ≠ "i..." — different uniform.
+// "i" ≠ "i..." — different uniform.
 type Normalize<E extends Elem> = E extends Dim
   ? { dim: E; uniform: "leaf" }
   : E extends MixedTag
@@ -29,20 +27,9 @@ type Normalize<E extends Elem> = E extends Dim
         ? { dim: DimOf<T>; uniform: V }
         : never;
 
-// Whether an In element matches an Actual element at the same position:
-// both sides normalized, then compared by mutual `extends`.
-//
-// This is structural equality on Normalize's output, not on Elem itself.
-// It's correct for every Elem form that exists today (Dim, MixedTag,
-// [Dim,Branch], [MixedTag,Variants]) because no two of them currently
-// normalize to the same { dim, uniform } shape for the same Dim. Before
-// adding a new Elem arm, check whether its Normalize output could
-// coincide with an existing arm's { dim, uniform } for the same Dim —
-// if it can, ElemMatches will silently accept the new form as equal to
-// the existing one. See BUGS.md / archive/BUGS-fixed.md for the
-// specific case this was flagged against (In "i" vs Actual ["i",
-// number] — currently rejected because "leaf" doesn't extend number,
-// but a future arm designed to reuse the "leaf" tag would slip through).
+// Structural equality on Normalize's output (see type-representation.md).
+// Bidirectional extends would silently accept a NEW Elem form that
+// normalizes identically to an existing one — check before adding an arm.
 type ElemMatches<InE extends Elem, ActualE extends Elem> =
   Normalize<ActualE> extends Normalize<InE>
     ? Normalize<InE> extends Normalize<ActualE>
@@ -50,8 +37,7 @@ type ElemMatches<InE extends Elem, ActualE extends Elem> =
       : false
     : false;
 
-// "..." reached → open tail succeeds. Must come before the Head/Tail
-// branch since "..." is a string literal, not an Elem.
+// "..." → open tail succeeds; must precede Head/Tail since "..." isn't an Elem.
 type MatchesShape<In extends Shape, Actual extends Shape> = In extends []
   ? Actual extends []
     ? true
@@ -67,28 +53,19 @@ type MatchesShape<In extends Shape, Actual extends Shape> = In extends []
         : false
       : false;
 
-// Driven by "..." in In — if present, open tail succeeds; otherwise exact
-// match required.
+// Open tail succeeds iff "..." appears in In; otherwise exact match required.
 export type MatchesIn<In extends Shape, Actual extends Shape> =
   MatchesShape<In, Actual> extends true ? Actual : never;
 
 // --- Call-site shape inference (see shape-inference.md) ---
 //
-// ShapeOf<D> derives a Shape from a value's static type, so a bare
-// literal can be checked at the call site with no `as Raw<S>` cast.
+// ShapeOf<D> derives a Shape from a bare literal so calls need no `as Raw<S>` cast.
 
-// True iff T is a genuine union (distributive-conditional trick: naked
-// T distributes over the union, so [U] extends [T] fails when T had >1
-// member).
+// True iff T is a genuine union (naked-T distributive trick).
 type IsUnion<T, U = T> = T extends U ? ([U] extends [T] ? false : true) : never;
 
-// ShapeOf<D> derives a Shape from a value's static type. The recheck
-// against Shape is required for tsc's inference at Check's call to
-// MatchesIn, not a runtime safety net — see archive/ for why.
-//
-// A container whose element type is a genuine union is heterogeneous by
-// construction — e.g. `[["a",1],["b",2]]` infers each row as
-// `(string|number)[]`, not a tuple, so that row is "i...".
+// Recheck against Shape is for tsc's inference at Check, not runtime. A
+// genuinely-union element type is heterogeneous by construction → "i..."/"k...".
 export type ShapeOf<D> = _ShapeOf<D> extends Shape ? _ShapeOf<D> : never;
 
 type _ShapeOf<D> =
@@ -104,8 +81,7 @@ type _ShapeOf<D> =
           : ["k", ...ContainerTail<D[keyof D]>]
         : [];
 
-// Tail for the already-uniform case: leaf stops at [], container
-// recurses one level.
+// Leaf stops at []; containers recurse one level.
 type ContainerTail<E> = [unknown] extends [E]
   ? []
   : E extends readonly unknown[]
@@ -114,9 +90,8 @@ type ContainerTail<E> = [unknown] extends [E]
       ? _ShapeOf<E>
       : [];
 
-// Must discriminate on the never sentinel itself ([X] extends [never]),
-// not X extends Shape — never extends Shape is true, which would
-// accept every call on failure.
+// Gate on the never sentinel, not X extends Shape — never extends Shape
+// is true, so the naive form accepts every call on failure.
 export type Check<In extends Shape, D> = [MatchesIn<In, ShapeOf<D>>] extends [
   never,
 ]

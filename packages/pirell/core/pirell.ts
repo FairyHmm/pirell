@@ -1,7 +1,6 @@
 import type { Dim } from "./types.js";
 
-// Bare data-bound surface: value only, untyped. Shape is a compile-time
-// claim an Op's signature makes, not something data carries at runtime.
+// Bare data-bound surface: value only, untyped (shape is a compile-time claim).
 export class Wrapper<S> {
   constructor(public readonly value: unknown) {
     // Mirror pirell(undefined): a Wrapper must never hold undefined.

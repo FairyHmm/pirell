@@ -1,13 +1,5 @@
 import { pirell as rawPirell } from "./pirell.js";
-import type {
-  Bound,
-  Deferred,
-  Dim,
-  Fluent,
-  Op,
-  Raw,
-  Shape,
-} from "./types.js";
+import type { Bound, Deferred, Dim, Fluent, Op, Raw, Shape } from "./types.js";
 import type { MatchesIn } from "./match.js";
 import { wireOps } from "./extend.js";
 import { compose, type Tail } from "./compose.js";
@@ -32,24 +24,9 @@ type Reassembled<S, Shp extends Shape> =
       ? Assembled<Deferred<Shp>>
       : never;
 
-// Reuses compose.ts's Tail directly (former PipeChain here was the same
-// Op-detect-and-thread walk, twice).
-//
-// The runtime surface (below) is a plain callable function with methods
-// attached via Object.defineProperty, cast to this type at its two
-// construction points (`as unknown as Assembled<...>`). That's a
-// deliberate, permanent boundary, not a gap to close: getting real
-// inference through a dynamically-built function object would mean
-// either rebuilding the surface per call with the narrowed generic
-// baked in (breaks the "one function, no rebuild" runtime model) or a
-// code-gen/proxy-based surface (a different assembly mechanism
-// entirely). Two visible costs of this boundary, both accepted:
-// `.pipe()`/`.compose()` on a Bound surface type as `unknown` rather
-// than the real result type (tests use `as any` there on purpose, not
-// as a workaround for a defect — see fixtures/assemble tests), and the
-// runtime `compose` calls inside buildWrapper/buildDeferred are cast to
-// `(...fns: Array<(x:any)=>any>) => ...`, discarding compose.ts's
-// ComposeChain/Tail typing rather than reusing it.
+// Reuses compose.ts's Tail. The runtime surface is built once as a plain
+// callable with defineProperty'd methods, then cast to this type — real
+// type inference through a per-call rebuild is an intentional non-goal.
 type Assembled<S> = S & {
   extend<K extends string, Op1 extends Op<any, any, any>>(
     ops: Op1 extends Op<infer In, any, any>
@@ -83,15 +60,9 @@ type Assembled<S> = S & {
 
 // --- Runtime surface builder ---
 //
-// Two kinds of surface, both callable:
-//   - Deferred (from pirell()): no data yet. Methods/.pipe()/.compose() append
-//     steps lazily. Calling it with raw JSON runs the steps and returns a
-//     data-bound Wrapper surface.
-//   - Wrapper (from pirell(data), or produced by calling a Deferred): raw JSON
-//     is bound. Methods apply immediately to the current value and return a new
-//     Wrapper. .pipe()/.compose() apply and return the raw JSON result.
-// Surfaces are callable so a Wrapper can be fed back as input (value is reused,
-// never re-run), which is what makes splitting a chain in two work.
+// Both surface kinds are callable (composition.md): a Deferred appends
+// steps lazily until data arrives; a Wrapper applies them immediately.
+// Callability lets a bound Wrapper feed back as input, reusing its value.
 
 const SURFACE = "__pirell";
 
