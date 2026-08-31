@@ -5,7 +5,7 @@ import {
   sumValues,
   toEntries,
   entriesToObject,
-} from "./test-utils.js";
+} from "./fixture-ops.js";
 
 // Head-node literals go bare (no cast) — ShapeOf derives shape
 // structurally, including mixed tails (see shape-inference.md).

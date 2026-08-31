@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { compose, pipe } from "./compose.js";
 import type { Raw } from "./types.js";
-import { double, sumAll, toEntries, flattenEntries } from "./test-utils.js";
+import { double, sumAll, toEntries, flattenEntries } from "./fixture-ops.js";
 
 describe("compose", () => {
   it("threads a value through a sequence of unary functions", () => {

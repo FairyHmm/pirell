@@ -7,7 +7,7 @@ import {
   sumValues,
   flattenEntries,
   stringifyValues,
-} from "./test-utils.js";
+} from "./fixture-ops.js";
 
 describe("Wrapper.extend (data-bound)", () => {
   it("wires a fluent method and returns a surface holding the raw result", () => {
