@@ -14,17 +14,17 @@ import {
 describe("type inference through chains", () => {
   it("i -> i: numbers stay numbered", () => {
     const nums = [1, 2, 3];
-    const result = double(nums);
+    const result = double()(nums);
     // If inference works, result is Raw<["i"]> and can feed back to double
-    const doubled = double(result);
+    const doubled = double()(result);
     expect(doubled).toEqual([4, 8, 12]);
   });
 
   it("k -> i...: object to entries preserves type through chain", () => {
     const obj = { a: 1, b: 2 };
-    const pairs = toEntries(obj);
+    const pairs = toEntries()(obj);
     // Result is Raw<["i","i..."]> — can feed to flattenEntries
-    const values = flattenEntries(pairs);
+    const values = flattenEntries()(pairs);
     expect(values).toEqual([1, 2]);
   });
 
@@ -33,11 +33,11 @@ describe("type inference through chains", () => {
       ["a", 1],
       ["b", 2],
     ];
-    const obj = entriesToObject(pairs);
+    const obj = entriesToObject()(pairs);
     // obj is Raw<["k"]> — can feed back to toEntries
-    const roundtrip = toEntries(obj);
+    const roundtrip = toEntries()(obj);
     // roundtrip is Raw<["i","i..."]> again — can chain further
-    const values = flattenEntries(roundtrip);
+    const values = flattenEntries()(roundtrip);
     expect(values).toEqual([1, 2]);
   });
 
@@ -46,9 +46,9 @@ describe("type inference through chains", () => {
       team_a: [10, 20, 30],
       team_b: [5, 15],
     };
-    const sums = sumValues(data);
+    const sums = sumValues()(data);
     // Result is Raw<["k"]> — object can feed back to toEntries
-    const pairs = toEntries(sums);
+    const pairs = toEntries()(sums);
     expect(pairs).toEqual([
       ["team_a", 60],
       ["team_b", 20],
@@ -60,9 +60,9 @@ describe("type inference through chains", () => {
       scores: [1, 2, 3],
       other: [10, 20],
     };
-    const sums = sumValues(data);
+    const sums = sumValues()(data);
     // Result is Raw<["k"]> — clean, can continue
-    const pairs = toEntries(sums);
+    const pairs = toEntries()(sums);
     expect(pairs).toHaveLength(2);
   });
 
@@ -72,30 +72,25 @@ describe("type inference through chains", () => {
       ["y", 20],
       ["z", 30],
     ];
-    const values = flattenEntries(mixed);
+    const values = flattenEntries()(mixed);
     // values is Raw<["i"]> — can feed to double
-    const doubled = double(values);
+    const doubled = double()(values);
     expect(doubled).toEqual([20, 40, 60]);
   });
 
   it("complex chain: k -> i... -> i -> i", () => {
     const obj = { p: 5, q: 10 };
-    const pairs = toEntries(obj);
-    const values = flattenEntries(pairs);
-    const doubled = double(values);
+    const pairs = toEntries()(obj);
+    const values = flattenEntries()(pairs);
+    const doubled = double()(values);
     expect(doubled).toEqual([10, 20]);
   });
 });
 
-// op()'s dual-form dispatcher (non-empty Args), exercised via `nth`.
-// See BUGS.md #8 / archive/BUGS-fixed.md for why this needed coverage.
-describe("op() dual-form dispatch (non-empty Args)", () => {
-  it("data-first: nth(data, i) applies immediately", () => {
-    const result = nth([10, 20, 30], 1);
-    expect(result).toBe(20);
-  });
-
-  it("curried: nth(i)(data) applies once data arrives", () => {
+// nth is a curried op: nth(i) returns the (data) => Raw<Out> stage —
+// Op<In,Out,Args> uniformly, Args=[number] here vs Args=[] for the rest.
+describe("curried op (nth)", () => {
+  it("nth(i)(data) applies once data arrives", () => {
     const result = nth(1)([10, 20, 30]);
     expect(result).toBe(20);
   });
@@ -106,20 +101,11 @@ describe("op() dual-form dispatch (non-empty Args)", () => {
     expect(second(["a", "b", "c"])).toBe("c");
   });
 
-  it("rejects wrong-shape data in data-first form", () => {
+  it("rejects wrong-shape data", () => {
     // Type check only — never runs
     if (false) {
       const obj = { a: 1 };
-      // @ts-expect-error -- nth expects ["i"], not ["k"]
-      nth(obj, 0);
-    }
-  });
-
-  it("rejects wrong-shape data in curried form", () => {
-    // Type check only — never runs
-    if (false) {
-      const obj = { a: 1 };
-      // @ts-expect-error -- nth expects ["i"], not ["k"]
+      // @ts-expect-error -- nth(0) expects ["i"], not ["k"]
       nth(0)(obj);
     }
   });
@@ -131,7 +117,7 @@ describe("type rejection through chains", () => {
     if (false) {
       const nums = [1, 2, 3];
       // @ts-expect-error -- toEntries expects ["k", "..."], not ["i"]
-      toEntries(nums);
+      toEntries()(nums);
     }
   });
 
@@ -140,7 +126,7 @@ describe("type rejection through chains", () => {
     if (false) {
       const obj = { a: 1 };
       // @ts-expect-error -- double expects ["i"], not ["k"]
-      double(obj);
+      double()(obj);
     }
   });
 
@@ -152,7 +138,7 @@ describe("type rejection through chains", () => {
         ["b", 2],
       ];
       // @ts-expect-error -- double expects exactly ["i"], not ["i","i..."]
-      double(pairs);
+      double()(pairs);
     }
   });
 
@@ -161,7 +147,7 @@ describe("type rejection through chains", () => {
     if (false) {
       const nested = { x: [1, 2] };
       // @ts-expect-error -- toEntries expects exactly ["k"], got ["k", "i"]
-      toEntries(nested);
+      toEntries()(nested);
     }
   });
 });

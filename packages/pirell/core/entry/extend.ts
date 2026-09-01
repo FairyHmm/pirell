@@ -2,7 +2,9 @@ import type { Op } from "../types/types.js";
 import { isSurface, valueOf } from "./surface.js";
 
 // Registers ops by name only; shape-checking lives at the Op signature
-// and in assemble.ts's chain typing.
+// and in assemble.ts's chain typing. Op<any,any,any> — Args varies per op
+// (nth takes [number], most take []), the fluent method forwards whatever
+// args the call site gives it.
 export function wireOps<Ops extends Record<string, Op<any, any, any>>>(
   target: any,
   ops: Ops,
@@ -30,11 +32,13 @@ export function extend(surfaceOrOps: any, ops?: any): any {
   if (typeof surfaceOrOps === "function") {
     // Unwrap a surface to its raw value before calling fn; a bare value
     // passes through. Both typeof checks matter (surfaces are callable fns).
+    // fn is a curried zero-arg Op here — call with no args to reach the
+    // (data) => result stage before applying to raw.
     return (surfaceOrValue: any) => {
       const raw = isSurface(surfaceOrValue)
         ? valueOf(surfaceOrValue)
         : surfaceOrValue;
-      return surfaceOrOps(raw);
+      return surfaceOrOps()(raw);
     };
   }
   return (surface: any) => applyExtend(surface, surfaceOrOps);

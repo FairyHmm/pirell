@@ -107,7 +107,7 @@ describe("standalone pipe/compose with pirell Ops", () => {
     // compose yields (data: Raw<In>) => Raw<Out>; an object literal can't
     // assign to the Raw<["k"]> brand (excess-property check), so it is fed
     // by a prior op's raw output instead — the cast-free compose path.
-    const entries = toEntries({ a: 1, b: 2 }) as Raw<["i", "i..."]>;
+    const entries = toEntries()({ a: 1, b: 2 }) as Raw<["i", "i..."]>;
     const result = compose(flattenEntries, double)(entries);
     expect(result).toEqual([2, 4]);
   });
