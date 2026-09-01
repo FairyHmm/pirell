@@ -27,18 +27,13 @@ type Normalize<E extends Elem> = E extends Dim
         ? { dim: DimOf<T>; uniform: V }
         : never;
 
-// Structural equality on Normalize's output (see type-representation.md).
-// Bidirectional extends would silently accept a NEW Elem form that
-// normalizes identically to an existing one — check before adding an arm.
+// Single-direction: Actual must extend In. Elem is closed — if a new arm is
+// added to Elem/Normalize, verify its output is not a subtype of an existing arm.
 type ElemMatches<InE extends Elem, ActualE extends Elem> =
-  Normalize<ActualE> extends Normalize<InE>
-    ? Normalize<InE> extends Normalize<ActualE>
-      ? true
-      : false
-    : false;
+  Normalize<ActualE> extends Normalize<InE> ? true : false;
 
 // "..." → open tail succeeds; must precede Head/Tail since "..." isn't an Elem.
-type MatchesShape<In extends Shape, Actual extends Shape> = In extends []
+export type MatchesShape<In extends Shape, Actual extends Shape> = In extends []
   ? Actual extends []
     ? true
     : false
@@ -90,10 +85,5 @@ type ContainerTail<E> = [unknown] extends [E]
       ? _ShapeOf<E>
       : [];
 
-// Gate on the never sentinel, not X extends Shape — never extends Shape
-// is true, so the naive form accepts every call on failure.
-export type Check<In extends Shape, D> = [MatchesIn<In, ShapeOf<D>>] extends [
-  never,
-]
-  ? never
-  : unknown;
+export type Check<In extends Shape, D> =
+  MatchesShape<In, ShapeOf<D>> extends true ? unknown : never;

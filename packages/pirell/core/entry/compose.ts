@@ -1,5 +1,5 @@
 import type { Op, Raw, Shape } from "../types/types.js";
-import type { Check, MatchesIn, ShapeOf } from "../types/match.js";
+import type { Check, MatchesShape, ShapeOf } from "../types/match.js";
 
 // Function composition, usable with Ops or plain unary fns, shape-checked
 // at compile time.
@@ -11,9 +11,9 @@ type ShapeOfCur<Cur> =
 // Apply fn F to Cur: F's output value type, or never on shape/link mismatch.
 type Apply<Cur, F> =
   F extends Op<infer FIn, infer FOut, any>
-    ? [MatchesIn<FIn, ShapeOfCur<Cur>>] extends [never]
-      ? never
-      : Raw<FOut>
+    ? MatchesShape<FIn, ShapeOfCur<Cur>> extends true
+      ? Raw<FOut>
+      : never
     : F extends (arg: Cur) => infer R
       ? R
       : never;
