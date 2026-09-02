@@ -79,10 +79,8 @@ describe("pipe", () => {
   });
 });
 
-// The same standalone utility composes pirell Ops directly (see
-// shape-inference.md). These live here, not assemble.test.ts: assemble
-// only wires pirell/pipe/compose/extend together into surfaces; this
-// utility's pirell-Op integration is standalone pipe/compose behaviour.
+// pipe/compose also integrate directly with pirell Ops (see shape-inference.md).
+// Kept here, not assemble.test.ts: assemble only wires surfaces together.
 describe("standalone pipe/compose with pirell Ops", () => {
   it("pipe(data, fns) works directly on raw JSON", () => {
     const result = pipe([1, 2, 3] as Raw<["i"]>, double, sumAll);
@@ -145,6 +143,15 @@ describe("standalone pipe/compose shape rejection (compile-time)", () => {
     if (false) {
       // @ts-expect-error toEntries (["k"] -> ["i","i..."]) then double needs ["i"], mismatch
       pipe({ a: 1 }, toEntries, double);
+    }
+  });
+
+  it("compose shape-gates bare object data (no cast needed)", () => {
+    if (false) {
+      // @ts-expect-error toEntries expects ["k"], not ["i"] from bare array
+      compose(toEntries)([1, 2, 3]);
+      // @ts-expect-error double expects ["i"], not ["k"] from bare object
+      compose(double)({ a: 1 });
     }
   });
 });

@@ -92,7 +92,9 @@ function buildWrapper(value: unknown, ops: OpMap): Assembled<Bound<any>> {
 
   wireOps(wrapper, ops, (op, args) =>
     buildWrapper(
-      (op as (...a: any[]) => (data: unknown) => unknown)(...args)(value),
+      (op as unknown as (...a: any[]) => (data: unknown) => unknown)(...args)(
+        value,
+      ),
       ops,
     ),
   );
@@ -135,7 +137,9 @@ function buildDeferred(
 
   wireOps(deferred, ops, (op, args) => {
     const step = (data: unknown) =>
-      (op as (...a: any[]) => (data: unknown) => unknown)(...args)(data);
+      (op as unknown as (...a: any[]) => (data: unknown) => unknown)(...args)(
+        data,
+      );
     return buildDeferred([...steps, step], ops);
   });
 

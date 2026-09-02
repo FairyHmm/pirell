@@ -5,28 +5,25 @@ import { describe, it, expect } from "vitest";
 import type { Op } from "../index.js";
 import { extend, pirell } from "../index.js";
 
-// Op is always curried: (...args) => (data) => result. Shapes come from the
-// Op<In,Out,Args> annotation; the op body is the curried (args) => (data) => R
-// form directly. groupBy partitions an indexed collection of keyed rows
-// (['i','k',...]).
-const groupBy: Op<["i", "k", "..."], ["k", "i", "k", "..."], [key: string]> =
-  (key: string) => (data: unknown) => {
-    const rows = data as Record<string, unknown>[];
-    const groups: Record<string, Record<string, unknown>[]> =
-      Object.create(null);
-    for (const row of rows) {
-      const k = String(row[key]);
-      (groups[k] ||= []).push(row);
-    }
-    return groups;
-  };
+// Op is always curried; the body is the curried form directly, shapes come
+// from the Op<...> annotation. The `as unknown as Op<...>` cast supplies the
+// required __pirell discriminant (BUGS.md #12), type-level only. groupBy
+// partitions an indexed collection of keyed rows (['i','k',...]).
+const groupBy = ((key: string) => (data: unknown) => {
+  const rows = data as Record<string, unknown>[];
+  const groups: Record<string, Record<string, unknown>[]> = Object.create(null);
+  for (const row of rows) {
+    const k = String(row[key]);
+    (groups[k] ||= []).push(row);
+  }
+  return groups;
+}) as unknown as Op<["i", "k", "..."], ["k", "i", "k", "..."], [key: string]>;
 
 // A second user op sharing the same registration path.
-const sum: Op<["i", "k", "..."], [], [key: string]> =
-  (key: string) => (data: unknown) => {
-    const rows = data as Record<string, unknown>[];
-    return rows.reduce((acc, row) => acc + Number(row[key]), 0);
-  };
+const sum = ((key: string) => (data: unknown) => {
+  const rows = data as Record<string, unknown>[];
+  return rows.reduce((acc, row) => acc + Number(row[key]), 0);
+}) as unknown as Op<["i", "k", "..."], [], [key: string]>;
 
 describe("recreating the library through the public API", () => {
   it("an Op is curried — call args then data", () => {

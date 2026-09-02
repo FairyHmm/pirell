@@ -9,11 +9,11 @@ export type Dim = "i" | "k";
 export type Branch =
   Shape | (string & {}) | (number & {}) | (boolean & {}) | object;
 
-// Positional/named variant forms for a Mixed node's children; array vs.
-// object is JSON's own fork, kept as a union rather than force-unified.
+// JSON's positional vs. named fork for a Mixed node's children, kept
+// distinct rather than force-unified.
 export type Variants = Branch[] | Record<string, Branch>;
 
-// MixedTag derives from Dim: "i..."/"k..." is just Dim + "heterogeneous children".
+// "i..."/"k..." = Dim + heterogeneous children.
 export type MixedTag = `${Dim}...`;
 
 // Elem: dim, mixed tag, or a [dim, Branch] / [mixedTag, variants] pair.
@@ -24,27 +24,28 @@ export type Shape = Elem[] | [...Elem[], "..."];
 
 // --- Data / Op ---
 
-// Raw<S> is a branded phantom: at runtime it IS the raw JSON value, no
-// wrapper. Interface (not `unknown & {brand}`) to stay a real structural
-// check instead of collapsing to `unknown` and erasing S.
+// Raw<S> is a branded phantom — at runtime it IS the raw JSON value. An
+// interface (not `unknown & {brand}`) stays a real structural check instead
+// of collapsing to `unknown`.
 declare const __shapeBrand: unique symbol;
 export interface Raw<S extends Shape> {
   readonly [__shapeBrand]?: S;
 }
 
-// Op: always curried — (...args) => (data) => Raw<Out>, shape-gated at the
-// data-application step. Args may be empty ([]); there is no separate
-// zero-arg shape. Internal call sites (compose/pipe/extend/assemble) only
-// ever consume this curried form — makeFlat exists solely to cross the
-// export boundary to a flat (data, ...args) => result caller.
-// Data is a gated generic rather than Raw<In> — data has no declared shape,
-// ops derive it (see shape-inference.md). __in/__out anchor In/Out for
-// comparison — load-bearing.
+// Op is always curried: (...args) => (data: gated) => Raw<Out>; Args may be
+// empty — there is no separate zero-arg shape. Data is a gated generic, not
+// Raw<In>, because data has no declared shape (ops derive it —
+// shape-inference.md); __in/__out keep In/Out comparable. __pirell is a
+// required compile-time discriminant — without it a bare (x: any) => any
+// leniently matches Op<infer...> in the chain helpers and collapses chains
+// to never (BUGS.md #12); authoring supplies it with a trailing
+// `as Op<In,Out>` cast (type-level only).
 export type Op<
   In extends Shape,
   Out extends Shape,
   Args extends unknown[] = [],
 > = ((...args: Args) => <D>(data: D & Check<In, D>) => Raw<Out>) & {
+  readonly __pirell: "op";
   readonly __in?: In;
   readonly __out?: Out;
 };
