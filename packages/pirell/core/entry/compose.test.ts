@@ -83,30 +83,35 @@ describe("pipe", () => {
 // Kept here, not assemble.test.ts: assemble only wires surfaces together.
 describe("standalone pipe/compose with pirell Ops", () => {
   it("pipe(data, fns) works directly on raw JSON", () => {
-    const result = pipe([1, 2, 3] as Raw<["i"]>, double, sumAll);
+    // No cast — ShapeOf derives [["i", number]] from the number[] literal
+    // directly (non-union primitive leaf), matching double/sumAll's claim.
+    const result = pipe([1, 2, 3], double, sumAll);
     expect(result).toBe(12);
   });
 
   it("compose(fns)(data) works directly on raw JSON", () => {
-    const result = compose(double, sumAll)([1, 2, 3] as Raw<["i"]>);
+    const result = compose(double, sumAll)([1, 2, 3]);
     expect(result).toBe(12);
   });
 
   it("pipe shape-gates a bare literal, no cast", () => {
     // No `as Raw<...>` — the Op-first overload checks the data's own
-    // derived shape against the first op's In.
+    // derived shape against the first op's In. toEntries/flattenEntries
+    // don't inspect value type, so no Branch claim, no cast needed here.
     const flat = pipe({ a: 1, b: 2 }, toEntries, flattenEntries);
     expect(flat).toEqual([1, 2]);
-    const numbers = pipe({ a: 1, b: 2 }, toEntries, flattenEntries, double);
-    expect(numbers).toEqual([2, 4]);
   });
 
-  it("compose with a prior op's raw output, no cast", () => {
+  it("compose with a prior op's raw output, seam cast to double's claim", () => {
     // compose yields (data: Raw<In>) => Raw<Out>; an object literal can't
     // assign to the Raw<["k"]> brand (excess-property check), so it is fed
     // by a prior op's raw output instead — the cast-free compose path.
+    // flattenEntries' Out is ["i"] (no element-type claim); double now
+    // claims [["i", number]] — bridging that seam is an explicit cast,
+    // not an inferred continuation (see fixture-ops.ts).
     const entries = toEntries()({ a: 1, b: 2 }) as Raw<["i", "i..."]>;
-    const result = compose(flattenEntries, double)(entries);
+    const flat = flattenEntries()(entries) as unknown as Raw<[["i", number]]>;
+    const result = double()(flat);
     expect(result).toEqual([2, 4]);
   });
 });
@@ -123,7 +128,7 @@ describe("standalone pipe/compose shape rejection (compile-time)", () => {
   it("rejects keyed data into an op expecting an indexed shape", () => {
     // Type check only — never runs.
     if (false) {
-      // @ts-expect-error double expects ["i"], not the derived ["k"]
+      // @ts-expect-error double expects [["i", number]], not the derived ["k"]
       pipe({ a: 1 }, double);
     }
   });
@@ -131,17 +136,19 @@ describe("standalone pipe/compose shape rejection (compile-time)", () => {
   it("rejects a compose link whose Out can't feed the next In", () => {
     // Type check only — never runs.
     if (false) {
-      // @ts-expect-error double Out ["i"] can't feed toEntries In ["k"]
+      // @ts-expect-error double Out [["i", number]] can't feed toEntries In ["k"]
       compose(double, toEntries);
-      // @ts-expect-error double Out ["i"] can't feed flattenEntries In ["i","i..."]
+      // @ts-expect-error double Out [["i", number]] can't feed flattenEntries In ["i","i..."]
       compose(double, flattenEntries);
+      // @ts-expect-error flattenEntries Out ["i"] (no element claim) can't feed double In [["i", number]]
+      compose(flattenEntries, double);
     }
   });
 
   it("rejects a chain narrowed by a mismatched final element", () => {
     // Type check only — never runs.
     if (false) {
-      // @ts-expect-error toEntries (["k"] -> ["i","i..."]) then double needs ["i"], mismatch
+      // @ts-expect-error toEntries (["k"] -> ["i","i..."]) then double needs [["i", number]], mismatch
       pipe({ a: 1 }, toEntries, double);
     }
   });
@@ -150,7 +157,7 @@ describe("standalone pipe/compose shape rejection (compile-time)", () => {
     if (false) {
       // @ts-expect-error toEntries expects ["k"], not ["i"] from bare array
       compose(toEntries)([1, 2, 3]);
-      // @ts-expect-error double expects ["i"], not ["k"] from bare object
+      // @ts-expect-error double expects [["i", number]], not ["k"] from bare object
       compose(double)({ a: 1 });
     }
   });

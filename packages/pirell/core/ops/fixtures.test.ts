@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { Raw } from "../types/types.js";
 import {
   double,
   flattenEntries,
@@ -8,14 +9,19 @@ import {
   nth,
 } from "./fixture-ops.js";
 
-// Head-node literals go bare (no cast) — ShapeOf derives shape
-// structurally, including mixed tails (see shape-inference.md).
+// All literals go bare — no cast. ShapeOf derives shape structurally,
+// including mixed tails and, for non-union primitive leaves, the Branch
+// itself (e.g. `[1,2,3]` derives [["i", number]], not just ["i"]) — see
+// shape-inference.md. Data has no inherent shape (ARCHITECTURE.md); an
+// `as Raw<S>` cast is a targeted escape hatch for what ShapeOf genuinely
+// can't derive (e.g. reaching past an already-erased `unknown`), not a
+// stand-in for shape inference.
 
 describe("type inference through chains", () => {
   it("i -> i: numbers stay numbered", () => {
     const nums = [1, 2, 3];
     const result = double()(nums);
-    // If inference works, result is Raw<["i"]> and can feed back to double
+    // result is Raw<[["i", number]]> — can feed back to double, no recast
     const doubled = double()(result);
     expect(doubled).toEqual([4, 8, 12]);
   });
@@ -73,8 +79,10 @@ describe("type inference through chains", () => {
       ["z", 30],
     ];
     const values = flattenEntries()(mixed);
-    // values is Raw<["i"]> — can feed to double
-    const doubled = double()(values);
+    // values is Raw<["i"]> (flattenEntries doesn't inspect value type — see
+    // fixture-ops.ts) — double now claims element type, so bridging the
+    // seam is an explicit, honest cast, not an inferred continuation.
+    const doubled = double()(values as unknown as Raw<[["i", number]]>);
     expect(doubled).toEqual([20, 40, 60]);
   });
 
@@ -82,7 +90,7 @@ describe("type inference through chains", () => {
     const obj = { p: 5, q: 10 };
     const pairs = toEntries()(obj);
     const values = flattenEntries()(pairs);
-    const doubled = double()(values);
+    const doubled = double()(values as unknown as Raw<[["i", number]]>);
     expect(doubled).toEqual([10, 20]);
   });
 });
@@ -125,7 +133,7 @@ describe("type rejection through chains", () => {
     // Type check only — never runs
     if (false) {
       const obj = { a: 1 };
-      // @ts-expect-error -- double expects ["i"], not ["k"]
+      // @ts-expect-error -- double expects [["i", number]], not ["k"]
       double()(obj);
     }
   });
@@ -137,7 +145,7 @@ describe("type rejection through chains", () => {
         ["a", 1],
         ["b", 2],
       ];
-      // @ts-expect-error -- double expects exactly ["i"], not ["i","i..."]
+      // @ts-expect-error -- double expects exactly [["i", number]], not ["i","i..."]
       double()(pairs);
     }
   });
