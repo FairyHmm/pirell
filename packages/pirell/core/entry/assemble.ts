@@ -19,18 +19,28 @@ import { SURFACE, isSurface, valueOf } from "./surface.js";
 type OpMap = Record<string, Op<any, any, any>>;
 
 // Unified output type: Bound and Deferred both resolve to what the next op
-// sees. Not unified with compose.ts's ShapeOfCur: this type unwraps a
+// sees. Not unified with chain.ts's link matching: this type unwraps a
 // *surface* whose Shape param (Bound<Shp>/Deferred<Out>) is always already
-// proven, so it never needs ShapeOfCur's structural-inference fallback —
-// this type's Raw<Shp> result is exactly the value position ShapeOfCur's
-// Raw<S> branch expects. One layer above, not a duplicate. See PLAN.md's
-// "Unify ShapeOfCur/CurrentData" step for the comparison.
+// proven, so it never needs structural inference — CurrentShp below is
+// exactly the proven shape Tail threads as CurShp, and this type's Raw<Shp>
+// result is the Cur value threaded alongside it. One layer above, not a
+// duplicate. See PLAN.md's "Unify ShapeOfCur/CurrentData" step for the
+// comparison.
 type CurrentData<S> =
   S extends Bound<infer Shp extends Shape>
     ? Raw<Shp>
     : S extends Deferred<infer Out extends Shape>
       ? Raw<Out>
       : never;
+
+// Proven shape of CurrentData<S> — the CurShp half of Tail's threading.
+// Always in lockstep with CurrentData above: Raw<Shp> value, Shp shape.
+type CurrentShp<S> =
+  S extends Bound<infer Shp extends Shape>
+    ? Shp
+    : S extends Deferred<infer Out extends Shape>
+      ? Out
+      : ["..."];
 
 // Retypes the surface after an op to reflect the new output shape.
 type Reassembled<S, Shp extends Shape> =
@@ -65,12 +75,12 @@ type Assembled<S> = S & {
     [K in keyof Ops]: Fluent<Ops[K] & Op<any, any, any>>;
   };
   pipe<Fns extends [(arg: CurrentData<S>) => any, ...Array<(arg: any) => any>]>(
-    ...fns: Fns & Tail<Fns, CurrentData<S>>
+    ...fns: Fns & Tail<Fns, CurrentData<S>, CurrentShp<S>>
   ): S extends Bound<any> ? unknown : Assembled<S>;
   compose<
     Fns extends [(arg: CurrentData<S>) => any, ...Array<(arg: any) => any>],
   >(
-    ...fns: Fns & Tail<Fns, CurrentData<S>>
+    ...fns: Fns & Tail<Fns, CurrentData<S>, CurrentShp<S>>
   ): S extends Bound<any> ? unknown : Assembled<S>;
 };
 
