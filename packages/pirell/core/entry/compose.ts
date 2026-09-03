@@ -12,6 +12,13 @@ export function compose(...fns: Array<(x: any) => any>): (x: any) => any {
   return (x: any) => stages.reduce((acc, fn) => fn(acc), x);
 }
 
-// Data-first view of compose, derived with no cast: makeFlat's gated
-// overload re-attaches the compile-time gate (ops.ts).
-export const pipe = makeFlat(compose);
+// Data-first view of compose. makeFlat is a shape-agnostic form converter,
+// so `makeFlat(compose)` carries no gate — the gate is authored here, at
+// compose/pipe's own site (not in makeFlat). Same Gate/ComposeChain/
+// ComposeResult compose uses, flipped to (data, ...fns).
+type PipeFn = <D, Fns extends unknown[]>(
+  data: Gate<Fns, D>,
+  ...fns: Fns & ComposeChain<Fns>
+) => ComposeResult<Fns>;
+
+export const pipe: PipeFn = makeFlat(compose) as unknown as PipeFn;

@@ -114,15 +114,3 @@ export type ComposeResult<Fns extends readonly unknown[]> =
           ? R
           : never
       : never;
-
-// The two public call shapes, named so makeFlat/makeCurry (ops.ts) can
-// convert between them with no cast. Mirror compose.ts's `compose`
-// overload and `pipe` const exactly — keep in sync.
-export type ComposeFn = <Fns extends unknown[]>(
-  ...fns: Fns & ComposeChain<Fns>
-) => <D>(data: Gate<Fns, D>) => ComposeResult<Fns>;
-
-export type PipeFn = <D, Fns extends unknown[]>(
-  data: Gate<Fns, D>,
-  ...fns: Fns & ComposeChain<Fns>
-) => ComposeResult<Fns>;
