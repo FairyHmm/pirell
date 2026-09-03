@@ -53,6 +53,15 @@ type Reassembled<S, Shp extends Shape> =
 // Reuses chain.ts's Tail. The runtime surface is built once as a plain
 // callable with defineProperty'd methods, then cast to this type — real
 // type inference through a per-call rebuild is an intentional non-goal.
+//
+// compose() is Deferred-only. A Bound surface already has data — there is
+// no un-applied state left to compose into, so top-level compose's "return
+// a function, don't apply yet" contract has nothing to mean there. pipe()
+// already covers the sole sensible Bound case (apply now, return the raw
+// result). Giving Bound a compose() that actually applies immediately
+// (matching pipe(), because that's the only thing it could do) would keep
+// the name but silently invert what it promises everywhere else in the
+// package — worse than not having the method.
 type Assembled<S> = S & {
   extend<K extends string, Op1 extends Op<any, any, any>>(
     ops: Op1 extends Op<infer In, any, any>
@@ -77,12 +86,15 @@ type Assembled<S> = S & {
   pipe<Fns extends [(arg: CurrentData<S>) => any, ...Array<(arg: any) => any>]>(
     ...fns: Fns & Tail<Fns, CurrentData<S>, CurrentShp<S>>
   ): S extends Bound<any> ? unknown : Assembled<S>;
-  compose<
-    Fns extends [(arg: CurrentData<S>) => any, ...Array<(arg: any) => any>],
-  >(
-    ...fns: Fns & Tail<Fns, CurrentData<S>, CurrentShp<S>>
-  ): S extends Bound<any> ? unknown : Assembled<S>;
-};
+} & (S extends Deferred<any>
+  ? {
+      compose<
+        Fns extends [(arg: CurrentData<S>) => any, ...Array<(arg: any) => any>],
+      >(
+        ...fns: Fns & Tail<Fns, CurrentData<S>, CurrentShp<S>>
+      ): Assembled<S>;
+    }
+  : {});
 
 // --- Runtime surface builder ---
 //
@@ -126,11 +138,9 @@ function buildWrapper(value: unknown, ops: OpMap): Assembled<Bound<any>> {
     )(value);
   };
 
-  (wrapper as any).compose = function (...fns: Array<(x: any) => any>) {
-    return (compose as (...fns: Array<(x: any) => any>) => (x: any) => any)(
-      ...fns,
-    )(value);
-  };
+  // No .compose() here — a Bound surface already has data; there's no
+  // deferred state to compose into, so it would just be pipe() under a
+  // name that promises the opposite (see Assembled<S>'s comment above).
 
   return wrapper;
 }

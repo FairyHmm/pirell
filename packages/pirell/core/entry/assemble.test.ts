@@ -70,20 +70,22 @@ describe("Wrapper.pipe (data-bound)", () => {
   });
 });
 
-describe("Wrapper.compose (data-bound)", () => {
-  it("applies plain functions immediately and returns the raw result", () => {
-    const result = (pirell([1, 2, 3]) as any).compose(double, sumAll);
-    expect(result).toBe(12);
+// Bound has no .compose(): it already holds data, so there's no deferred
+// state to compose into — it would just be pipe() under a name that
+// promises the opposite of what pipe() does everywhere else in the
+// package (see assemble.ts's Assembled<S> comment).
+describe("Wrapper.compose (data-bound): intentionally absent", () => {
+  it("is not present on a Bound surface", () => {
+    const wrapper = pirell([1, 2, 3]) as any;
+    expect(wrapper.compose).toBeUndefined();
   });
 
-  it("composes with shape transitions", () => {
-    const result = (pirell({ a: [1, 2], b: [3, 4] }) as any).compose(
-      sumValues,
-      toEntries,
-      flattenEntries,
-      double,
-    );
-    expect(result).toEqual([6, 14]);
+  it("rejects at the type level too", () => {
+    // Type check only — never runs.
+    if (false) {
+      // @ts-expect-error -- compose() only exists on Deferred, not Bound
+      pirell([1, 2, 3]).compose(double, sumAll);
+    }
   });
 });
 
