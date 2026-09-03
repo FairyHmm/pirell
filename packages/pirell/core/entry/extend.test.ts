@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { pirell } from "./assemble.js";
 import { extend } from "./extend.js";
 import { pipe } from "./compose.js";
-import { double } from "../ops/fixture-ops.js";
+import { double, nth } from "../ops/fixture-ops.js";
 
 describe("standalone extend()", () => {
   it("applied directly, mirrors the .extend() method (Deferred)", () => {
@@ -29,5 +29,22 @@ describe("standalone extend()", () => {
     const fn = extend(double) as (x: any) => any;
     const result = pipe(pirell([1, 2, 3]), fn);
     expect(result).toEqual([2, 4, 6]);
+  });
+
+  it("rejects a parameterized op at the type level", () => {
+    // Type check only — never runs (would throw at runtime too, see below).
+    if (false) {
+      // @ts-expect-error -- nth has Args=[number]; extend(fn) only accepts
+      // Args=[] since it calls fn() with no arguments to reach (data) => R.
+      extend(nth);
+    }
+  });
+
+  it("rejects a parameterized op at runtime too, with an actionable message", () => {
+    // Same call, forced past the type system (e.g. a JS caller, or `as any`)
+    // — the arity check is a real runtime guard, not just a type-level one.
+    expect(() => (extend as any)(nth)([1, 2, 3])).toThrow(
+      /parameterized ops aren't supported/,
+    );
   });
 });

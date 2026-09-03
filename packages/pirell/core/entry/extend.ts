@@ -24,7 +24,11 @@ export function extend<Ops extends Record<string, Op<any, any, any>>>(
 export function extend<Ops extends Record<string, Op<any, any, any>>>(
   ops: Ops,
 ): (surface: any) => any;
-export function extend(fn: Op<any, any, any>): (x: any) => any;
+// Args constrained to [] here: this form calls fn with zero args to reach
+// its (data) => result stage. A parameterized op (e.g. nth's [i: number])
+// would silently run with its argument missing — reject it at the type
+// level rather than let it compile and misbehave at runtime.
+export function extend(fn: Op<any, any, []>): (x: any) => any;
 export function extend(surfaceOrOps: any, ops?: any): any {
   if (ops !== undefined) {
     return applyExtend(surfaceOrOps, ops);
@@ -34,6 +38,11 @@ export function extend(surfaceOrOps: any, ops?: any): any {
     // passes through. Both typeof checks matter (surfaces are callable fns).
     // fn is a curried zero-arg Op here — call with no args to reach the
     // (data) => result stage before applying to raw.
+    if (surfaceOrOps.length !== 0) {
+      throw new TypeError(
+        `extend(fn): fn expects ${surfaceOrOps.length} argument(s) — parameterized ops aren't supported by this form (their argument would be silently missing). Wire it via extend(surface, { name: fn }) instead, or pre-apply the argument: extend(fn(arg)).`,
+      );
+    }
     return (surfaceOrValue: any) => {
       const raw = isSurface(surfaceOrValue)
         ? valueOf(surfaceOrValue)
