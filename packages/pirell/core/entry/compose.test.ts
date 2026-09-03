@@ -162,3 +162,34 @@ describe("standalone pipe/compose shape rejection (compile-time)", () => {
     }
   });
 });
+
+// A spread array of ops (as opposed to a literal `pipe(data, a, b)` call)
+// widens to Fns["length"]: number, which TypeScript can't type-check
+// per-link (see chain.ts's ComposeChain non-tuple branch) — there is no
+// runtime shape tag on Op to check it there either (brand-removal is
+// intentional, see PLAN.md). This describes what actually happens instead:
+// a clear, stage-labeled error rather than a bare crash from deep inside
+// whichever op's body first chokes on the wrong shape.
+describe("compose/pipe: unchecked spread-array chains fail loudly", () => {
+  it("wraps a stage's runtime error with stage index and cause", () => {
+    const fns: Array<typeof double> = [double];
+    expect(() => pipe({ a: 1 } as any, ...fns)).toThrow(/stage 0 threw/);
+  });
+
+  it("preserves the original error as `cause`", () => {
+    const fns: Array<typeof double> = [double];
+    try {
+      pipe({ a: 1 } as any, ...fns);
+      expect.unreachable();
+    } catch (err) {
+      expect(err).toBeInstanceOf(Error);
+      expect((err as Error).cause).toBeInstanceOf(TypeError);
+    }
+  });
+
+  it("a well-typed spread-array chain still works normally", () => {
+    const fns: Array<typeof double> = [double];
+    const result = pipe([1, 2, 3], ...fns);
+    expect(result).toEqual([2, 4, 6]);
+  });
+});
