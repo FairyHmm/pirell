@@ -8,10 +8,12 @@
 // Method: writes a generated stress file into perf/ (picked up by the
 // package tsconfig), runs `tsc --noEmit --extendedDiagnostics`, parses
 // Instantiations/Check time, and reports deltas against a same-imports
-// baseline as a Markdown table (paste-ready for Docs/). Every run must be
-// error-free (`error TS` fails the probe — error paths instantiate
-// different types and would pollute the numbers). The temp file is removed
-// afterwards, even on failure.
+// baseline as a Markdown table (paste-ready for Docs/). Errors in the
+// stress file itself fail the probe (error paths instantiate different
+// types and would pollute the numbers); errors elsewhere are reported and
+// ignored, so ablation experiments can run while the library's own
+// rejection tests are red. The temp file is removed afterwards, even on
+// failure.
 //
 // Excluded from publishing: `perf/**` is in jsr.json's publish.exclude,
 // npm only ships `dist/`, and tsdown's entry is `index.ts`.
@@ -79,12 +81,20 @@ interface Args {
 
 function parseArgs(argv: string[]): Args {
   const out: Args = { counts: [1, 50, 100], only: null };
-  for (const arg of argv) {
-    if (arg.startsWith("--counts="))
-      out.counts = arg.slice("--counts=".length).split(",").map(Number);
-    else if (arg.startsWith("--only="))
-      out.only = new Set(arg.slice("--only=".length).split(","));
+  const rest: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (arg === "--") continue; // pnpm/npm pass-through separator
+    const [flag, inline] = arg.split("=", 2);
+    if (flag === "--counts" || flag === "--only") {
+      // Accept both `--flag value` and `--flag=value`.
+      const value = inline ?? argv[++i];
+      if (value === undefined) throw new Error(`${flag} needs a value`);
+      if (flag === "--counts") out.counts = value.split(",").map(Number);
+      else out.only = new Set(value.split(","));
+    } else rest.push(arg);
   }
+  if (rest.length > 0) throw new Error(`unknown args: ${rest.join(" ")}`);
   if (out.only)
     for (const name of out.only)
       if (!(name in SCENARIOS)) throw new Error(`unknown scenario: ${name}`);
@@ -108,17 +118,27 @@ function measure(body: string): Measurement {
       stdio: ["ignore", "pipe", "pipe"],
     });
   } catch (err) {
-    // tsc exits non-zero on type errors — still inspect output for counts,
-    // but error paths invalidate the measurement.
+    // tsc exits non-zero on type errors — still inspect output for counts.
+    // Only errors in the stress file itself invalidate the measurement
+    // (this scoping also lets ablation experiments run while the library's
+    // own rejection tests are red; correctness stays vitest/tsc's job).
     const e = err as { stdout?: unknown; stderr?: unknown };
     stdout = String(e.stdout ?? "") + String(e.stderr ?? "");
     const errLines = stdout
       .split("\n")
-      .filter((l) => l.includes("error TS"))
+      .filter((l) => l.includes("stress.tmp.ts") && l.includes("error TS"))
       .slice(0, 5);
-    throw new Error(
-      `tsc reported errors, measurement invalid:\n${errLines.join("\n")}`,
-    );
+    if (errLines.length > 0)
+      throw new Error(
+        `tsc reported errors in the stress file, measurement invalid:\n${errLines.join("\n")}`,
+      );
+    // Errors elsewhere (e.g. library rejection tests during an ablation):
+    // warn, measure anyway.
+    const other = stdout
+      .split("\n")
+      .filter((l) => l.includes("error TS")).length;
+    if (other > 0)
+      console.log(`(note: ${other} error(s) outside the stress file — ignored)`);
   }
   const inst = Number(stdout.match(/Instantiations:\s+(\d+)/)?.[1]);
   const check = Number(stdout.match(/Check time:\s+([\d.]+)s/)?.[1]);
