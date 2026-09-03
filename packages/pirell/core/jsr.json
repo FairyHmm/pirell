@@ -6,6 +6,7 @@
     "exclude": [
       "**/*.test.ts",
       "**/fixture-ops.ts",
+      "perf/**",
       "tsconfig.json",
       "tsdown.config.ts",
       "vitest.config.ts"
