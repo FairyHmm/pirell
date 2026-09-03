@@ -115,10 +115,19 @@ type IsConcreteLeaf<E> = [unknown] extends [E]
         ? false
         : true;
 
+// Raw<S> is now concrete (DataOf<S> & brand, types.ts), so a bare value
+// matches `Raw<infer S>` vacuously with S inferred as the whole Shape
+// union — that union carries no information (Check collapses to never).
+// Only trust S when it's a concrete non-empty tuple (a real brand can
+// only exist then: Raw<[]>/Raw<["..."]> collapse to plain unknown).
+// Otherwise fall back to structural derivation, which round-trips bare
+// literals exactly.
 type _ShapeOf<D> = HasStringIndex<D> extends true
   ? _ShapeOfContainer<D>
-  : D extends Raw<infer S>
-    ? S
+  : D extends Raw<infer S extends Shape>
+    ? S extends [Elem, ...Shape]
+      ? S
+      : _ShapeOfContainer<D>
     : _ShapeOfContainer<D>;
 
 type _ShapeOfContainer<D> = D extends readonly (infer E)[]

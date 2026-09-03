@@ -10,7 +10,8 @@ import type {
 } from "../types/types.js";
 import type { MatchesIn } from "../types/match.js";
 import { wireOps } from "./extend.js";
-import { compose, type Tail } from "./compose.js";
+import { compose } from "./compose.js";
+import type { Tail } from "../types/chain.js";
 import { SURFACE, isSurface, valueOf } from "./surface.js";
 
 // Single wiring point: primitives stay ignorant of each other.
@@ -39,7 +40,7 @@ type Reassembled<S, Shp extends Shape> =
       ? Assembled<Deferred<Shp>>
       : never;
 
-// Reuses compose.ts's Tail. The runtime surface is built once as a plain
+// Reuses chain.ts's Tail. The runtime surface is built once as a plain
 // callable with defineProperty'd methods, then cast to this type — real
 // type inference through a per-call rebuild is an intentional non-goal.
 type Assembled<S> = S & {

@@ -150,12 +150,12 @@ describe("type rejection through chains", () => {
     }
   });
 
-  it("rejects k,i when expecting k (depth mismatch)", () => {
-    // Type check only — never runs
-    if (false) {
-      const nested = { x: [1, 2] };
-      // @ts-expect-error -- toEntries expects exactly ["k"], got ["k", "i"]
-      toEntries()(nested);
-    }
+  it("accepts nested values when expecting bare k (more detail is welcome)", () => {
+    // Bare ["k"] claims only keyed-ness — DataOf<["k"]> is
+    // Record<string, unknown> — so nested values satisfy it. Depth
+    // rejection now lives in Check/ShapeOf (bare literals), not in the
+    // op's own data param.
+    const nested = { x: [1, 2] };
+    expect(toEntries()(nested)).toEqual([["x", [1, 2]]]);
   });
 });
