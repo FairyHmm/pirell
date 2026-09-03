@@ -4,12 +4,19 @@ import { makeFlat } from "../ops/ops.js";
 
 // --- Shape gate for compose/pipe ---
 
-// First link's In when it's a zero-arg Op; otherwise ["..."] — an
-// uncheckable first link (plain fn or parameterized op) must not gate D.
+// A zero-arg fn returning a fn is a curried Op-shaped link, matched by
+// call shape alone — no nominal Op brand. Mirrors compose's own runtime
+// check (`fn.length === 0 ? fn() : fn` below).
+type IsThunk<F> = F extends () => (data: any) => any ? true : false;
+
+// First link's In when it's a zero-arg Op-shaped thunk with a declared
+// Op<FIn,...> type; otherwise ["..."] (uncheckable first link).
 type FirstIn<Fns> = Fns extends [infer F, ...unknown[]]
-  ? F extends Op<infer FIn, any, infer FArgs>
-    ? FArgs extends []
-      ? FIn
+  ? IsThunk<F> extends true
+    ? F extends Op<infer FIn, any, infer FArgs>
+      ? FArgs extends []
+        ? FIn
+        : ["..."]
       : ["..."]
     : ["..."]
   : never;
@@ -18,20 +25,24 @@ type FirstIn<Fns> = Fns extends [infer F, ...unknown[]]
 // drift between the two call sites.
 type Gate<Fns, D> = D & Check<FirstIn<Fns>, D>;
 
-// Shape a value carries at the current position (Raw<S> phantom, else structural).
+// Shape a value carries at the current position (Raw<S> brand, else
+// structural inference via ShapeOf). See PLAN.md re: assemble.ts's
+// CurrentData, one layer above this, not a duplicate.
 type ShapeOfCur<Cur> =
   Cur extends Raw<infer S extends Shape> ? S : ShapeOf<Cur> & Shape;
 
-// F's output value type, or never on shape/link mismatch. Zero-arg Ops
-// auto-invoke as chain links; a parameterized Op (Args non-empty) rejects
-// so its required argument can't be silently dropped.
+// F's output value type, or never on shape/link mismatch.
 type Apply<Cur, F> =
-  F extends Op<infer FIn, infer FOut, infer FArgs>
-    ? FArgs extends []
-      ? MatchesShape<FIn, ShapeOfCur<Cur>> extends true
-        ? Raw<FOut>
+  IsThunk<F> extends true
+    ? F extends Op<infer FIn, infer FOut, infer FArgs>
+      ? FArgs extends []
+        ? MatchesShape<FIn, ShapeOfCur<Cur>> extends true
+          ? Raw<FOut>
+          : never
         : never
-      : never
+      : F extends () => (data: any) => infer R
+        ? R
+        : never
     : F extends (arg: Cur) => infer R
       ? R
       : never;
@@ -48,13 +59,22 @@ export type Tail<Fns, Cur> = Fns extends [infer F, ...infer Rest]
       : never
   : [];
 
-// Compose's first link input comes from its own signature, not from data, so
-// it isn't shape-gated here. Zero-arg Op auto-invokes, same as Apply.
+// WIP — see HANDOFF.md "ComposeChain collapses to never". The Op branch's
+// tuple element is F itself (Op<FIn,FOut,[]>, still double-curried) to
+// match what's actually passed positionally; something in this union
+// still resolves to never downstream (assemble.ts/compose.test.ts break).
+// Not landed as correct — left in place for the next session to pick up.
 type ComposeChain<Fns> = Fns extends [infer F, ...infer Rest]
-  ? F extends Op<infer FIn, infer FOut, infer FArgs>
-    ? FArgs extends []
-      ? [(arg: Raw<FIn>) => Raw<FOut>, ...Tail<Rest, Raw<FOut>>]
-      : never
+  ? IsThunk<F> extends true
+    ? F extends Op<infer FIn, infer FOut, infer FArgs>
+      ? FArgs extends []
+        ? [Op<FIn, FOut, []>, ...Tail<Rest, Raw<FOut>>]
+        : never
+      : F extends () => (data: infer A) => infer R
+        ? Rest extends []
+          ? [() => (data: A) => R]
+          : [() => (data: A) => R, ...Tail<Rest, R>]
+        : never
     : F extends (arg: infer A) => infer R
       ? Rest extends []
         ? [(arg: A) => R]
@@ -63,7 +83,13 @@ type ComposeChain<Fns> = Fns extends [infer F, ...infer Rest]
   : never;
 
 type ComposeResult<Fns> =
-  ComposeChain<Fns> extends [...unknown[], (arg: any) => infer R] ? R : never;
+  ComposeChain<Fns> extends [...unknown[], infer Last]
+    ? Last extends Op<any, infer LOut, any>
+      ? Raw<LOut>
+      : Last extends (arg: any) => infer R
+        ? R
+        : never
+    : never;
 
 // Returns a function — data is applied later, shape-gated at that call.
 export function compose<Fns extends unknown[]>(

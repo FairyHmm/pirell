@@ -1,5 +1,3 @@
-import type { Check } from "./match.js";
-
 // --- Dim & Elem representation ---
 
 export type Dim = "i" | "k";
@@ -24,31 +22,72 @@ export type Shape = Elem[] | [...Elem[], "..."];
 
 // --- Data / Op ---
 
-// Raw<S> is a branded phantom — at runtime it IS the raw JSON value. An
-// interface (not `unknown & {brand}`) stays a real structural check instead
-// of collapsing to `unknown`.
-declare const __shapeBrand: unique symbol;
-export interface Raw<S extends Shape> {
-  readonly [__shapeBrand]?: S;
-}
+// DataOf<S>: shape → concrete TS type, inverse of ShapeOf. A Shape's
+// elements form one recursive descent, not siblings — ["k",["i",number]]
+// is "keyed container of arrays of number" — mirroring _ShapeOfContainer
+// in match.ts. See PLAN.md's brand-removal notes for the derivation.
+export type DataOf<S extends Shape> = S extends []
+  ? unknown
+  : S extends ["..."]
+    ? unknown
+    : S extends [infer Head extends Elem, ...infer Rest extends Shape]
+      ? DataOfElem<Head, Rest>
+      : unknown;
 
-// Op is always curried: (...args) => (data: gated) => Raw<Out>; Args may be
-// empty — there is no separate zero-arg shape. Data is a gated generic, not
-// Raw<In>, because data has no declared shape (ops derive it —
-// shape-inference.md); __in/__out keep In/Out comparable. __pirell is a
-// required compile-time discriminant — without it a bare (x: any) => any
-// leniently matches Op<infer...> in the chain helpers and collapses chains
-// to never (BUGS.md #12); authoring supplies it with a trailing
-// `as Op<In,Out>` cast (type-level only).
+// Rest only matters when Head is a bare Dim/MixedTag (no Branch payload);
+// then Rest is itself the nested Shape for the container's contents.
+type DataOfElem<E extends Elem, Rest extends Shape> = E extends "i"
+  ? Rest extends []
+    ? unknown[]
+    : DataOf<Rest>[]
+  : E extends "k"
+    ? Rest extends []
+      ? Record<string, unknown>
+      : DataOf<Rest> extends infer V
+        ? Record<string, V>
+        : never
+    : E extends "i..."
+      ? unknown[]
+      : E extends "k..."
+        ? Record<string, unknown>
+        : E extends [infer D extends Dim, infer B extends Branch]
+          ? D extends "i"
+            ? B extends Shape
+              ? DataOf<B>[]
+              : B[]
+            : B extends Shape
+              ? Record<string, DataOf<B>>
+              : Record<string, B>
+          : E extends [infer T extends MixedTag, infer _V extends Variants]
+            ? DimOf<T> extends "i"
+              ? unknown[]
+              : Record<string, unknown>
+            : unknown;
+
+type DimOf<T extends MixedTag> = T extends `${infer D extends Dim}...`
+  ? D
+  : never;
+
+// Raw<S> = DataOf<S> & optional brand, not a bare phantom — this is what
+// lets a prior op's Raw<In> output satisfy the next op's DataOf<In> param
+// with zero cast (PLAN.md: brand-removal). The [unknown] extends
+// [DataOf<S>] guard covers S=[]/["..."]: `unknown & X` collapses to X, and
+// a primitive return value has no properties in common with a bare
+// optional-key object — so with no shape claim, Raw<S> stays unbranded
+// unknown rather than an unsatisfiable object type.
+declare const __shapeBrand: unique symbol;
+export type Raw<S extends Shape> = [unknown] extends [DataOf<S>]
+  ? unknown
+  : DataOf<S> & { readonly [__shapeBrand]?: S };
+
+// Op is always curried: (...args) => (data: DataOf<In>) => Raw<Out>.
+// __pirell brand is gone; thunk-vs-plain-fn discrimination is structural
+// (arity), handled in compose.ts, not nominal — see PLAN.md.
 export type Op<
   In extends Shape,
   Out extends Shape,
   Args extends unknown[] = [],
-> = ((...args: Args) => <D>(data: D & Check<In, D>) => Raw<Out>) & {
-  readonly __pirell: "op";
-  readonly __in?: In;
-  readonly __out?: Out;
-};
+> = (...args: Args) => (data: DataOf<In>) => Raw<Out>;
 
 // Not `this`-typed: closes over the op at attach time, then narrows on each
 // .extend() so the pre-call shape no longer matches.

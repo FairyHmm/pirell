@@ -17,7 +17,13 @@ import { SURFACE, isSurface, valueOf } from "./surface.js";
 
 type OpMap = Record<string, Op<any, any, any>>;
 
-// Unified output type: Bound and Deferred both resolve to what the next op sees.
+// Unified output type: Bound and Deferred both resolve to what the next op
+// sees. Not unified with compose.ts's ShapeOfCur: this type unwraps a
+// *surface* whose Shape param (Bound<Shp>/Deferred<Out>) is always already
+// proven, so it never needs ShapeOfCur's structural-inference fallback —
+// this type's Raw<Shp> result is exactly the value position ShapeOfCur's
+// Raw<S> branch expects. One layer above, not a duplicate. See PLAN.md's
+// "Unify ShapeOfCur/CurrentData" step for the comparison.
 type CurrentData<S> =
   S extends Bound<infer Shp extends Shape>
     ? Raw<Shp>
