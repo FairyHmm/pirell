@@ -1,11 +1,15 @@
-import type { ComposeChain, ComposeResult, ComposeGate } from "../types/chain.js";
+import type {
+  ComposeChain,
+  ComposeResult,
+  ComposeGate,
+} from "../types/chain.js";
 import { makeFlat } from "../ops/ops.js";
 
-// Returns a function — data is applied later, shape-gated at that call.
-export function compose<Fns extends unknown[]>(
-  ...fns: Fns & ComposeChain<Fns>
-): <D>(data: ComposeGate<Fns, D>) => ComposeResult<Fns>;
-export function compose(...fns: Array<(x: any) => any>): (x: any) => any {
+// Untyped runtime shared by the typed compose wrapper below and the
+// surface builders (which thread untyped step arrays, not Fns tuples).
+// The stage-invoke + stage-error contract lives here, in exactly one
+// place — builders call this directly instead of re-casting compose.
+export function composeRaw(...fns: Array<(x: any) => any>): (x: any) => any {
   // A zero-arg Op arrives curried — one extra call yields the (data) => R
   // stage; a bare fn is already that stage.
   const stages = fns.map((fn) => (fn.length === 0 ? (fn as () => any)() : fn));
@@ -29,6 +33,14 @@ export function compose(...fns: Array<(x: any) => any>): (x: any) => any {
         );
       }
     }, x);
+}
+
+// Returns a function — data is applied later, shape-gated at that call.
+export function compose<Fns extends unknown[]>(
+  ...fns: Fns & ComposeChain<Fns>
+): <D>(data: ComposeGate<Fns, D>) => ComposeResult<Fns>;
+export function compose(...fns: Array<(x: any) => any>): (x: any) => any {
+  return composeRaw(...fns);
 }
 
 // Data-first view of compose. makeFlat is a shape-agnostic form converter,

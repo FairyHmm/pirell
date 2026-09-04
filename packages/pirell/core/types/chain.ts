@@ -18,20 +18,38 @@ type IsTuple<Fns extends readonly unknown[]> = number extends Fns["length"]
 // ShapeOf narrowed to Shape: the proven-shape half of a Step pair.
 type ProvenShape<R> = ShapeOf<R> & Shape;
 
-// First link's In when it's a zero-arg Op-shaped thunk with a declared
-// Op<FIn,...> type; otherwise ["..."] (uncheckable first link). Args is
-// matched against literal [] directly — every false path is ["..."] anyway.
-type FirstIn<Fns> = Fns extends [infer F, ...unknown[]]
-  ? IsThunk<F> extends true
-    ? F extends Op<infer FIn, any, []>
-      ? FIn
-      : ["..."]
-    : ["..."]
-  : never;
+// Both ends of the chain, read off the single ComposeChain computation:
+// the first link's In feeds the input gate, the last link's Out feeds the
+// result projection. Previously two separate walks (FirstIn over raw Fns,
+// LastOut over the normalized chain) — one ends-of-chain concept instead.
+// The first link is already normalized by ComposeChain (Op stays Op, bare
+// thunk stays thunk), so the []-args gate reads the same here as on raw
+// Fns; a parameterized first link already poisons ComposeChain to never
+// at the fns param. The extends-Shape guards keep the degenerate empty
+// chain (already rejected at the param) from leaking unknown through the
+// vacuous-never match.
+type ChainEnds<Fns extends readonly unknown[]> =
+  ComposeChain<Fns> extends [infer First, ...unknown[]]
+    ? ComposeChain<Fns> extends [...unknown[], infer Last]
+      ? [
+          First extends Op<infer FIn extends Shape, any, []> ? FIn : ["..."],
+          IsThunk<Last> extends true
+            ? Last extends Op<any, infer LOut extends Shape, any>
+              ? Raw<LOut>
+              : Last extends () => (data: any) => infer R
+                ? R
+                : never
+            : Last extends (arg: any) => infer R
+              ? R
+              : never,
+        ]
+      : never
+    : never;
 
 // Shared by compose's return and pipe's signature so the data gate can't
 // drift between the two call sites.
-export type ComposeGate<Fns, D> = D & CheckData<FirstIn<Fns>, D>;
+export type ComposeGate<Fns extends readonly unknown[], D> = D &
+  CheckData<ChainEnds<Fns>[0] extends infer I extends Shape ? I : ["..."], D>;
 
 // One link step: [output value type, output shape]. A thunk link with a
 // declared Op matches against the threaded proven shape and carries FOut
@@ -52,18 +70,6 @@ type Step<F, Cur, CurShp extends Shape> =
       ? [R, ProvenShape<R>]
       : never;
 
-// Value half of a Step, evaluated once (same infer-S shape as Tail).
-// The never-guard is load-bearing (non-naked Step + vacuous never match
-// would infer R=unknown, swallowing mismatches).
-type StepVal<F, Cur, CurShp extends Shape> =
-  Step<F, Cur, CurShp> extends infer S
-    ? S extends never
-      ? never
-      : S extends [infer R, any]
-        ? R
-        : never
-    : never;
-
 // Expected tuple element for a link: a zero-arg Op is passed un-invoked,
 // so it stays double-curried; a plain fn is already single-arg.
 type Link<F, Cur, R> =
@@ -80,6 +86,9 @@ type Link<F, Cur, R> =
 // (CurShp). Step is evaluated once, bound as S: `S extends never` stays a
 // naked-param check, so a never Step still propagates instead of matching
 // [infer R, ...] vacuously (never is assignable to everything).
+// Non-tuple (spread) chains keep each link's own signature — length is
+// unknown so per-link threading is impossible; spreads are unchecked by
+// design (see compose.test.ts), same as ComposeChain's non-tuple arm.
 export type Tail<Fns extends readonly unknown[], Cur, CurShp extends Shape> =
   IsTuple<Fns> extends true
     ? Fns extends [infer F, ...infer Rest]
@@ -94,7 +103,7 @@ export type Tail<Fns extends readonly unknown[], Cur, CurShp extends Shape> =
         : never
       : []
     : Fns extends Array<infer F>
-      ? Array<Link<F, Cur, StepVal<F, Cur, CurShp>>>
+      ? Array<F>
       : never;
 
 // First link keeps its double-curried Op type — the op itself is passed
@@ -124,20 +133,5 @@ export type ComposeChain<Fns extends readonly unknown[]> =
         : Array<F>
       : never;
 
-// Last link's Out: mirror image of FirstIn (chain input-gate vs
-// output-projection, both wrapping ComposeChain/Tail).
-type LastOut<Fns extends readonly unknown[]> =
-  ComposeChain<Fns> extends [...unknown[], infer Last]
-    ? IsThunk<Last> extends true
-      ? Last extends Op<any, infer LOut, any>
-        ? Raw<LOut>
-        : Last extends () => (data: any) => infer R
-          ? R
-          : never
-      : Last extends (arg: any) => infer R
-        ? R
-        : never
-    : never;
-
 export type ComposeResult<Fns extends readonly unknown[]> =
-  IsTuple<Fns> extends true ? LastOut<Fns> : unknown; // non-tuple chain: statically untraceable, runtime still applies left-to-right
+  IsTuple<Fns> extends true ? ChainEnds<Fns>[1] : unknown; // non-tuple chain: statically untraceable, runtime still applies left-to-right

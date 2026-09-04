@@ -17,9 +17,11 @@ import type { IsUnion } from "./codec.js";
 
 // D's dim+kind+descent in one test — the data-side mirror of Normalize's
 // {dim, uniform} for an Elem, with the descended type attached. One
-// evaluation feeds the dim check, the kind check, and the descent.
-// Always tuple-wrap at use sites: a non-container D yields never, and
-// bare never matches everything.
+// evaluation feeds the dim check, the kind check, the descent, and the
+// emptiness check: an empty container descends to never (no elements, no
+// property values), so MatchData's terminal arm reads "empty" off .value
+// instead of a second structural walk. Always tuple-wrap at use sites: a
+// non-container D yields never, and bare never matches everything.
 type NormalizeData<D> = D extends readonly (infer E)[]
   ? {
       dim: "i";
@@ -34,17 +36,6 @@ type NormalizeData<D> = D extends readonly (infer E)[]
       }
     : never;
 
-// D has no properties / no elements — the empty-array-or-object shape.
-type IsEmptyIsh<D> = D extends readonly unknown[]
-  ? D extends readonly []
-    ? true
-    : false
-  : D extends object
-    ? keyof D extends never
-      ? true
-      : false
-    : false;
-
 // A consumed Head leaves nothing ([]) or an open tail (["..."]) behind.
 type TailOk<Tail extends Shape> = Tail extends []
   ? true
@@ -53,60 +44,56 @@ type TailOk<Tail extends Shape> = Tail extends []
     : false;
 
 export type MatchData<In extends Shape, D> = In extends []
-  ? IsEmptyIsh<D> extends true
-    ? true
-    : false
+  ? [NormalizeData<D>] extends [never]
+    ? false // not a container at all — never matches every object arm vacuously, so guard first
+    : [NormalizeData<D>] extends [{ value: never }]
+      ? true // container with nothing inside
+      : false
   : In extends ["..."]
     ? true
     : In extends [infer InHead extends Elem, ...infer InTail extends Shape]
       ? MatchHead<InHead, InTail, D>
       : false;
 
-type MatchHead<Head extends Elem, InTail extends Shape, D> = Head extends Dim
-  ? MatchBareDim<Head, InTail, D>
+// Head normalized once: dim to match, expected kind, optional declared
+// payload. One evaluation replaces the four per-arm NormalizeData checks
+// (bare dim / mixed tag / declared payload / mixed variants each re-spelled
+// the dim+kind test with its own DimTable lookup). Bare dims descend —
+// their tail is the container's value-shape — everything else is terminal.
+// (Normalize from match-shape.ts can't drive this: it erases bare-vs-
+// declared — Normalize<"i"> and Normalize<["i","leaf"]> coincide — while
+// the continuation depends on exactly that distinction.)
+type HeadKind<Head extends Elem> = Head extends Dim
+  ? { dim: Head; kind: "leaf"; branch: never }
   : Head extends MixedTag
-    ? MatchMixed<Head, InTail, D>
+    ? { dim: DimTable[Head]; kind: "mixed"; branch: never }
     : Head extends [infer ID extends Dim, infer B extends Branch]
-      ? MatchDeclared<ID, B, InTail, D>
+      ? { dim: ID; kind: "leaf"; branch: B }
       : Head extends [infer IT extends MixedTag, infer _V extends Variants]
-        ? MatchMixedVariants<IT, InTail, D>
-        : false;
+        ? { dim: DimTable[IT]; kind: "mixed"; branch: never }
+        : never;
 
-// Bare "i"/"k": dim+leaf in one NormalizeData test, then descend into .value.
-type MatchBareDim<IDim extends Dim, InTail extends Shape, D> = [
-  NormalizeData<D>,
-] extends [{ dim: IDim; uniform: "leaf"; value: infer V }]
-  ? TailOk<InTail> extends true
-    ? true
-    : MatchData<InTail, V>
-  : false;
-
-// Mixed tags are terminal — the tail, if present, is an open "...".
-// Expected dim comes off DimTable, same lookup Normalize uses.
-type MatchMixed<IT extends MixedTag, InTail extends Shape, D> = [
-  NormalizeData<D>,
-] extends [{ dim: DimTable[IT]; uniform: "mixed" }]
-  ? TailOk<InTail>
-  : false;
-
-// Declared payload fully claims this Elem: no further siblings allowed.
-type MatchDeclared<
-  ID extends Dim,
-  B extends Branch,
-  InTail extends Shape,
-  D,
-> = [NormalizeData<D>] extends [{ dim: ID; uniform: "leaf"; value: infer V }]
-  ? MatchBranch<B, V> extends true
-    ? TailOk<InTail>
-    : false
-  : false;
-
-// Mixed variants declare no checkable payload — kind match only.
-type MatchMixedVariants<IT extends MixedTag, InTail extends Shape, D> = [
-  NormalizeData<D>,
-] extends [{ dim: DimTable[IT]; uniform: "mixed" }]
-  ? TailOk<InTail>
-  : false;
+type MatchHead<Head extends Elem, InTail extends Shape, D> = [
+  HeadKind<Head>,
+] extends [never]
+  ? false
+  : HeadKind<Head> extends {
+        dim: infer HDim;
+        kind: infer HKind;
+        branch: infer Br;
+      }
+    ? [NormalizeData<D>] extends [{ dim: HDim; uniform: HKind; value: infer V }]
+      ? [Br] extends [never]
+        ? HKind extends "mixed"
+          ? TailOk<InTail>
+          : TailOk<InTail> extends true
+            ? true
+            : MatchData<InTail, V>
+        : MatchBranch<Extract<Br, Branch>, V> extends true
+          ? TailOk<InTail>
+          : false
+      : false
+    : false;
 
 // Nested Shape recurses without materializing D's own Shape; a leaf type
 // compares structurally (both directions — same strictness as Normalize).
