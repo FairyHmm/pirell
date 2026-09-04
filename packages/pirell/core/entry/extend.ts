@@ -1,14 +1,10 @@
 import type { Op } from "../types/base.js";
+import type { OpMap } from "./assemble.js";
 import { valueOf } from "./surface.js";
 
 // Two calling conventions: extend(surface, ops) or extend(ops)(surface)
-export function extend<Ops extends Record<string, Op<any, any, any>>>(
-  surface: any,
-  ops: Ops,
-): any;
-export function extend<Ops extends Record<string, Op<any, any, any>>>(
-  ops: Ops,
-): (surface: any) => any;
+export function extend<Ops extends OpMap>(surface: any, ops: Ops): any;
+export function extend<Ops extends OpMap>(ops: Ops): (surface: any) => any;
 // Args constrained to [] here: this form calls fn with zero args to reach
 // its (data) => result stage. A parameterized op (e.g. nth's [i: number])
 // would silently run with its argument missing — reject it at the type
@@ -36,10 +32,7 @@ export function extend(surfaceOrOps: any, ops?: any): any {
   return (surface: any) => applyExtend(surface, surfaceOrOps);
 }
 
-function applyExtend(
-  surface: any,
-  ops: Record<string, Op<any, any, any>>,
-): any {
+function applyExtend(surface: any, ops: OpMap): any {
   if (typeof surface.extend !== "function") {
     throw new TypeError(
       "extend(surface, ops): surface has no .extend() method — pass an assembled pirell() surface.",

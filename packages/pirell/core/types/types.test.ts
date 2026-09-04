@@ -1,6 +1,8 @@
 import { describe, expectTypeOf, it } from "vitest";
 import type { CheckShape } from "./match-shape.js";
-import type { ShapeOf } from "./codec.js";
+import type { ShapeOf, DataOf } from "./codec.js";
+import type { MatchData } from "./match-data.js";
+import type { Shape } from "./base.js";
 
 // Named-field shapes for testing both acceptance and rejection.
 type UserShape = ["k...", { name: string; age: number }];
@@ -75,6 +77,20 @@ describe("shape matching: CheckShape", () => {
     type Result = CheckShape<["i"], ["i..."]>;
     expectTypeOf<Result>().toEqualTypeOf<never>();
   });
+
+  // Declared-variants payloads compare structurally (VActual extends VIn):
+  // the canonical ElemCase drops V for match-data's kind-only check, but
+  // MatchElem's variants arm still compares payloads — removing that arm
+  // would silently accept this.
+  it("declared-variants In rejects an incompatible-V Actual", () => {
+    type Result = CheckShape<[["i...", [number]]], [["i...", [string]]]>;
+    expectTypeOf<Result>().toEqualTypeOf<never>();
+  });
+
+  it("declared-variants In accepts a same-V Actual", () => {
+    type Result = CheckShape<[["i...", [number]]], [["i...", [number]]]>;
+    expectTypeOf<Result>().toEqualTypeOf<[["i...", [number]]]>();
+  });
 });
 
 describe("shape inference: ShapeOf", () => {
@@ -122,5 +138,73 @@ describe("shape inference: ShapeOf", () => {
     // Raw<infer S> would produce if it wrongly matched.
     expectTypeOf<Result>().toEqualTypeOf<[["k", number]]>();
     expectTypeOf<Result>().not.toEqualTypeOf<import("./base.js").Shape>();
+  });
+});
+
+// DataOf (codec.ts, Shape→type for bodies) and MatchData (match-data.ts,
+// Shape↔Data gate) implement the same four-case Elem analysis twice, in
+// different vocabularies — a drift footgun. These cases couple them: each
+// asserts the PAIR [match verdict, DataOf acceptance], so a change to
+// either descent breaks the tuple loudly. The [false, true] pairs are
+// deliberate strictness (MatchData may exceed DataOf, never trail it —
+// otherwise the gate would admit what the body can't handle).
+describe("correspondence: DataOf vs MatchData", () => {
+  type Matches<In extends Shape, D> = MatchData<In, D> extends true
+    ? true
+    : false;
+  type Accepts<D, T> = [D] extends [T] ? true : false;
+  type Case<In extends Shape, D> = [Matches<In, D>, Accepts<D, DataOf<In>>];
+
+  it("bare dims agree on acceptance", () => {
+    expectTypeOf<Case<["i"], number[]>>().toEqualTypeOf<[true, true]>();
+    expectTypeOf<Case<["k"], { a: 1 }>>().toEqualTypeOf<[true, true]>();
+  });
+
+  it("declared payloads agree on acceptance", () => {
+    expectTypeOf<Case<[["i", number]], number[]>>().toEqualTypeOf<
+      [true, true]
+    >();
+    expectTypeOf<Case<[["k", { name: string }]], { user: { name: string } }>>().toEqualTypeOf<
+      [true, true]
+    >();
+  });
+
+  it("mixed, open, empty, and nested shapes agree on acceptance", () => {
+    expectTypeOf<Case<["i..."], (number | string)[]>>().toEqualTypeOf<
+      [true, true]
+    >();
+    expectTypeOf<Case<["k", "..."], { a: 1 }>>().toEqualTypeOf<[true, true]>();
+    expectTypeOf<Case<[], {}>>().toEqualTypeOf<[true, true]>();
+    expectTypeOf<
+      Case<[["k", [["i", number]]]], { a: number[] }>
+    >().toEqualTypeOf<[true, true]>();
+  });
+
+  it("dim mismatches agree on rejection", () => {
+    expectTypeOf<Case<["i"], { a: 1 }>>().toEqualTypeOf<[false, false]>();
+    expectTypeOf<Case<[["k", number]], { a: "x" }>>().toEqualTypeOf<
+      [false, false]
+    >();
+  });
+
+  // A declared [] payload checks EVERY value for emptiness; a bare dim
+  // claims nothing about values. DataOf erases both to the same
+  // Record<string, unknown> — the gate must not be "fixed" to agree.
+  it("declared-empty is strictly narrower than bare (do not unify)", () => {
+    expectTypeOf<Case<[["k", []]], { a: 5 }>>().toEqualTypeOf<[false, true]>();
+    expectTypeOf<Case<[["k", []]], { a: [] }>>().toEqualTypeOf<[true, true]>();
+  });
+
+  // Leaf comparison is bidirectional (invariance-like): a tuple is not
+  // widened to its element type, even though it extends the array.
+  it("leaf invariance is strictly narrower than assignability (do not loosen)", () => {
+    expectTypeOf<Case<[["i", number]], [1, 2]>>().toEqualTypeOf<[false, true]>();
+  });
+
+  // An empty container normalizes to mixed kind (vacuous never), so bare
+  // leaf claims reject it; only In=[] accepts empties. Pre-existing,
+  // not a regression — pin it so nobody "fixes" the kind rule.
+  it("bare claims reject empty containers (do not relax)", () => {
+    expectTypeOf<Case<["k"], {}>>().toEqualTypeOf<[false, true]>();
   });
 });

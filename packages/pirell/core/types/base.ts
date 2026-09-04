@@ -32,6 +32,21 @@ export type DimTable = {
 // Open-tail applies only to nested Shape; Mixed/MixedTag are terminal.
 export type Shape = Elem[] | [...Elem[], "..."];
 
+// One canonical Elem classification. match-shape.ts (compare payloads)
+// and match-data.ts (descend into values or check the branch) branch off
+// its fields instead of re-spelling the four cases each. Bare-vs-declared
+// stays visible (branch/variants set or never) — that distinction drives
+// both matchers' continuations, so no normalizer may erase it.
+export type ElemCase<E extends Elem> = E extends Dim
+  ? { dim: E; kind: "leaf"; branch: never; variants: never }
+  : E extends MixedTag
+    ? { dim: DimTable[E]; kind: "mixed"; branch: never; variants: never }
+    : E extends [infer D extends Dim, infer B extends Branch]
+      ? { dim: D; kind: "leaf"; branch: B; variants: never }
+      : E extends [infer T extends MixedTag, infer V extends Variants]
+        ? { dim: DimTable[T]; kind: "mixed"; branch: never; variants: V }
+        : never;
+
 // --- Data / Op ---
 
 // Shape↔type mapping lives in codec.ts (DataOf/ShapeOf are inverses —

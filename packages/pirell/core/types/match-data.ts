@@ -1,12 +1,4 @@
-import type {
-  Branch,
-  Dim,
-  DimTable,
-  Elem,
-  MixedTag,
-  Shape,
-  Variants,
-} from "./base.js";
+import type { Branch, Elem, ElemCase, Shape } from "./base.js";
 import type { IsUnion } from "./codec.js";
 
 // Shape-vs-Data matching. Fused inference+match: walks In's Elem-list
@@ -55,29 +47,15 @@ export type MatchData<In extends Shape, D> = In extends []
       ? MatchHead<InHead, InTail, D>
       : false;
 
-// Head normalized once: dim to match, expected kind, optional declared
-// payload. One evaluation replaces the four per-arm NormalizeData checks
-// (bare dim / mixed tag / declared payload / mixed variants each re-spelled
-// the dim+kind test with its own DimTable lookup). Bare dims descend —
-// their tail is the container's value-shape — everything else is terminal.
-// (Normalize from match-shape.ts can't drive this: it erases bare-vs-
-// declared — Normalize<"i"> and Normalize<["i","leaf"]> coincide — while
-// the continuation depends on exactly that distinction.)
-type HeadKind<Head extends Elem> = Head extends Dim
-  ? { dim: Head; kind: "leaf"; branch: never }
-  : Head extends MixedTag
-    ? { dim: DimTable[Head]; kind: "mixed"; branch: never }
-    : Head extends [infer ID extends Dim, infer B extends Branch]
-      ? { dim: ID; kind: "leaf"; branch: B }
-      : Head extends [infer IT extends MixedTag, infer _V extends Variants]
-        ? { dim: DimTable[IT]; kind: "mixed"; branch: never }
-        : never;
-
+// The head goes through the canonical ElemCase; the continuation branches
+// off its fields. Bare dims descend — their tail is the container's
+// value-shape — everything else is terminal, with a declared Branch
+// checked per value.
 type MatchHead<Head extends Elem, InTail extends Shape, D> = [
-  HeadKind<Head>,
+  ElemCase<Head>,
 ] extends [never]
   ? false
-  : HeadKind<Head> extends {
+  : ElemCase<Head> extends {
         dim: infer HDim;
         kind: infer HKind;
         branch: infer Br;
