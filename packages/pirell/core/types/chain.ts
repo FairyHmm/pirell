@@ -15,8 +15,12 @@ type IsTuple<Fns extends readonly unknown[]> = number extends Fns["length"]
   ? false
   : true;
 
-// ShapeOf narrowed to Shape: the proven-shape half of a Step pair.
-type ProvenShape<R> = ShapeOf<R> & Shape;
+// The proven-shape half of a Step pair is ShapeOf<R> as-is: intersecting
+// it with Shape (the old ProvenShape alias) broke the very next link,
+// because MatchShape's [infer Head extends Elem, ...] destructure fails
+// against an intersection while the clean tuple matches (proven by
+// scratch probe during the Angle-2 investigation — every bare->Op chain
+// was rejected before this fix).
 
 // Both ends of the chain, read off the single ComposeChain computation:
 // the first link's In feeds the input gate, the last link's Out feeds the
@@ -64,10 +68,10 @@ type Step<F, Cur, CurShp extends Shape> =
           : never
         : never
       : F extends () => (data: any) => infer R
-        ? [R, ProvenShape<R>]
+        ? [R, ShapeOf<R>]
         : never
     : F extends (arg: Cur) => infer R
-      ? [R, ProvenShape<R>]
+      ? [R, ShapeOf<R>]
       : never;
 
 // Expected tuple element for a link: a zero-arg Op is passed un-invoked,
@@ -119,12 +123,12 @@ export type ComposeChain<Fns extends readonly unknown[]> =
           : F extends () => (data: infer A) => infer R
             ? Rest extends []
               ? [() => (data: A) => R]
-              : [() => (data: A) => R, ...Tail<Rest, R, ProvenShape<R>>]
+              : [() => (data: A) => R, ...Tail<Rest, R, ShapeOf<R>>]
             : never
         : F extends (arg: infer A) => infer R
           ? Rest extends []
             ? [(arg: A) => R]
-            : [(arg: A) => R, ...Tail<Rest, R, ProvenShape<R>>]
+            : [(arg: A) => R, ...Tail<Rest, R, ShapeOf<R>>]
           : never
       : never
     : Fns extends Array<infer F>
