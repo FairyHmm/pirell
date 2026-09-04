@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { compose, pipe } from "./compose.js";
-import type { Raw } from "../types/types.js";
+import type { Raw } from "../types/base.js";
 import {
   double,
   sumAll,

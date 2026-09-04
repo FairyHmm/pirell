@@ -2,7 +2,7 @@
 // type-level shape inference. Bare Wrapper lives in pirell.ts; runtime
 // builders in builders.ts.
 
-import { buildDeferred, buildWrapper } from "./builders.js";
+import { buildDeferred, buildBound } from "./builders.js";
 import type {
   Bound,
   Deferred,
@@ -11,8 +11,8 @@ import type {
   Op,
   Raw,
   Shape,
-} from "../types/types.js";
-import type { MatchesIn } from "../types/match.js";
+} from "../types/base.js";
+import type { CheckShape } from "../types/match-shape.js";
 import type { Tail } from "../types/chain.js";
 
 export type OpMap = Record<string, Op<any, any, any>>;
@@ -47,7 +47,7 @@ type Reassembled<S, Shp extends Shape> =
 
 // An op fits the surface iff its input shape matches the current data.
 type Fits<In extends Shape, S, Yes> =
-  MatchesIn<In, Extract<CurrentData<S>, Shape>> extends Shape ? Yes : never;
+  CheckShape<In, Extract<CurrentData<S>, Shape>> extends Shape ? Yes : never;
 
 // Chain constraint, shared by pipe/compose: first fn takes current data.
 type ChainFns<S> = [
@@ -98,5 +98,5 @@ export function pirell(...args: [unknown] | []): unknown {
   if (args.length === 0) {
     return buildDeferred([], {});
   }
-  return buildWrapper(args[0], {});
+  return buildBound(args[0], {});
 }

@@ -13,13 +13,9 @@ export function makeCurry<A extends unknown[], D, R>(
       fn(data, ...args);
 }
 
-// Type-level curried → flat, deriving the other form from the input's own
-// structure. Preserves data type params from the source (`(data: X<D>) => R`).
-// A curried fn whose data param is itself generic (e.g. a gated
-// `compose`'s `<D>(data: Gate<Fns,D>) => R`) does not round-trip here — the
-// flattened form must keep its gate, which makeFlat (shape-agnostic by
-// design) does not carry. gating/compose/pipe declare that explicitly at
-// their own site (compose.ts), not here.
+// Type-level curried → flat. A gated data param (compose's
+// `<D>(data: ComposeGate<Fns,D>)`) does not round-trip — the gate lives
+// at compose.ts, not in this shape-agnostic converter.
 type Flatten<F> = F extends (...args: infer A) => (data: infer Data) => infer R
   ? (data: Data, ...args: A) => R
   : never;

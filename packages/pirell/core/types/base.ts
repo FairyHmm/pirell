@@ -1,3 +1,5 @@
+import type { DataOf } from "./codec.js";
+
 // --- Dim & Elem representation ---
 
 export type Dim = "i" | "k";
@@ -17,56 +19,23 @@ export type MixedTag = `${Dim}...`;
 // Elem: dim, mixed tag, or a [dim, Branch] / [mixedTag, variants] pair.
 export type Elem = Dim | MixedTag | [Dim, Branch] | [MixedTag, Variants];
 
+// Every bare tag's dim in one lookup — replaces DimOf template inference.
+// Shared by DataOfElem (codec.ts), Normalize (match.ts), and NormalizeData
+// (match-data.ts).
+export type DimTable = {
+  i: "i";
+  "i...": "i";
+  k: "k";
+  "k...": "k";
+};
+
 // Open-tail applies only to nested Shape; Mixed/MixedTag are terminal.
 export type Shape = Elem[] | [...Elem[], "..."];
 
 // --- Data / Op ---
 
-// DataOf<S>: shape → concrete TS type, inverse of ShapeOf. A Shape's
-// elements form one recursive descent, not siblings — ["k",["i",number]]
-// is "keyed container of arrays of number" — mirroring _ShapeOfContainer
-// in match.ts. See PLAN.md's brand-removal notes for the derivation.
-export type DataOf<S extends Shape> = S extends []
-  ? unknown
-  : S extends ["..."]
-    ? unknown
-    : S extends [infer Head extends Elem, ...infer Rest extends Shape]
-      ? DataOfElem<Head, Rest>
-      : unknown;
-
-// Rest only matters when Head is a bare Dim/MixedTag (no Branch payload);
-// then Rest is itself the nested Shape for the container's contents.
-type DataOfElem<E extends Elem, Rest extends Shape> = E extends "i"
-  ? Rest extends []
-    ? unknown[]
-    : DataOf<Rest>[]
-  : E extends "k"
-    ? Rest extends []
-      ? Record<string, unknown>
-      : DataOf<Rest> extends infer V
-        ? Record<string, V>
-        : never
-    : E extends "i..."
-      ? unknown[]
-      : E extends "k..."
-        ? Record<string, unknown>
-        : E extends [infer D extends Dim, infer B extends Branch]
-          ? D extends "i"
-            ? B extends Shape
-              ? DataOf<B>[]
-              : B[]
-            : B extends Shape
-              ? Record<string, DataOf<B>>
-              : Record<string, B>
-          : E extends [infer T extends MixedTag, infer _V extends Variants]
-            ? DimOf<T> extends "i"
-              ? unknown[]
-              : Record<string, unknown>
-            : unknown;
-
-type DimOf<T extends MixedTag> = T extends `${infer D extends Dim}...`
-  ? D
-  : never;
+// Shape↔type mapping lives in codec.ts (DataOf/ShapeOf are inverses —
+// same ladder, opposite directions). Raw/Op below build on DataOf.
 
 // Raw<S> = DataOf<S> & optional brand, not a bare phantom — this is what
 // lets a prior op's Raw<In> output satisfy the next op's DataOf<In> param

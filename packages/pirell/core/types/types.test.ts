@@ -1,38 +1,39 @@
 import { describe, expectTypeOf, it } from "vitest";
-import type { MatchesIn, ShapeOf } from "./match.js";
+import type { CheckShape } from "./match-shape.js";
+import type { ShapeOf } from "./codec.js";
 
 // Named-field shapes for testing both acceptance and rejection.
 type UserShape = ["k...", { name: string; age: number }];
 type OrderShape = ["k...", { id: number; total: number }];
 
-describe("shape matching: MatchesIn", () => {
+describe("shape matching: CheckShape", () => {
   it("exact match: shapes with identical structure pass", () => {
-    type Result = MatchesIn<["i"], ["i"]>;
+    type Result = CheckShape<["i"], ["i"]>;
     expectTypeOf<Result>().toEqualTypeOf<["i"]>();
   });
 
   it("shape mismatch: different dimension types fail", () => {
-    type Result = MatchesIn<["i"], ["k"]>;
+    type Result = CheckShape<["i"], ["k"]>;
     expectTypeOf<Result>().toEqualTypeOf<never>();
   });
 
   it("open tail: [...] matches any suffix in Actual", () => {
-    type Result = MatchesIn<["i", "..."], ["i", "k", "i"]>;
+    type Result = CheckShape<["i", "..."], ["i", "k", "i"]>;
     expectTypeOf<Result>().toEqualTypeOf<["i", "k", "i"]>();
   });
 
   it("closed tail: exact length is required, extra elements fail", () => {
-    type Result = MatchesIn<["i"], ["i", "k"]>;
+    type Result = CheckShape<["i"], ["i", "k"]>;
     expectTypeOf<Result>().toEqualTypeOf<never>();
   });
 
   it("named shapes: differing field types reject", () => {
-    type Result = MatchesIn<[UserShape], [OrderShape]>;
+    type Result = CheckShape<[UserShape], [OrderShape]>;
     expectTypeOf<Result>().toEqualTypeOf<never>();
   });
 
   it("named shape acceptance: matching fields pass", () => {
-    type Result = MatchesIn<
+    type Result = CheckShape<
       [UserShape],
       [["k...", { name: string; age: number }]]
     >;
@@ -42,12 +43,12 @@ describe("shape matching: MatchesIn", () => {
   });
 
   it("depth mismatch: extra dimensions fail", () => {
-    type Result = MatchesIn<["k", "i"], ["k", "i", "..."]>;
+    type Result = CheckShape<["k", "i"], ["k", "i", "..."]>;
     expectTypeOf<Result>().toEqualTypeOf<never>();
   });
 
   it("open tail accepts truncation: 0 extra dimensions in Actual", () => {
-    type Result = MatchesIn<["k", "i", "..."], ["k", "i"]>;
+    type Result = CheckShape<["k", "i", "..."], ["k", "i"]>;
     expectTypeOf<Result>().toEqualTypeOf<["k", "i"]>();
   });
 
@@ -56,22 +57,22 @@ describe("shape matching: MatchesIn", () => {
   // op doesn't need it"). The reverse must still fail: a declared In makes
   // a real claim, so a bare or less-specific Actual can't satisfy it.
   it("bare In accepts a Branch-declared Actual of the same dim", () => {
-    type Result = MatchesIn<["k"], [["k", number]]>;
+    type Result = CheckShape<["k"], [["k", number]]>;
     expectTypeOf<Result>().toEqualTypeOf<[["k", number]]>();
   });
 
   it("declared In still rejects a bare Actual (reverse direction)", () => {
-    type Result = MatchesIn<[["k", number]], ["k"]>;
+    type Result = CheckShape<[["k", number]], ["k"]>;
     expectTypeOf<Result>().toEqualTypeOf<never>();
   });
 
   it("bare In accepts a Variants-declared mixed Actual of the same dim", () => {
-    type Result = MatchesIn<["i..."], [["i...", [string, number]]]>;
+    type Result = CheckShape<["i..."], [["i...", [string, number]]]>;
     expectTypeOf<Result>().toEqualTypeOf<[["i...", [string, number]]]>();
   });
 
   it("leaf vs mixed kind still distinct even when In is bare", () => {
-    type Result = MatchesIn<["i"], ["i..."]>;
+    type Result = CheckShape<["i"], ["i..."]>;
     expectTypeOf<Result>().toEqualTypeOf<never>();
   });
 });
@@ -120,8 +121,6 @@ describe("shape inference: ShapeOf", () => {
     // Must be the concrete derived shape, not the unconstrained Shape union
     // Raw<infer S> would produce if it wrongly matched.
     expectTypeOf<Result>().toEqualTypeOf<[["k", number]]>();
-    expectTypeOf<Result>().not.toEqualTypeOf<
-      import("./types.js").Shape
-    >();
+    expectTypeOf<Result>().not.toEqualTypeOf<import("./base.js").Shape>();
   });
 });

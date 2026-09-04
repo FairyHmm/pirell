@@ -1,7 +1,6 @@
 import { compose } from "./compose.js";
-import { wireOps } from "./extend.js";
 import { SURFACE, isSurface, valueOf } from "./surface.js";
-import type { Bound, Deferred, Op } from "../types/types.js";
+import type { Bound, Deferred, Op } from "../types/base.js";
 import type { Assembled, OpMap } from "./assemble.js";
 
 // Runtime surface builders (companion to assemble.ts, which owns the
@@ -20,6 +19,20 @@ const runOp = (op: Op<any, any, any>, args: any[], data: unknown): unknown =>
 // One untyped bridge over compose, shared by the pipe/compose call sites.
 const asComposed = (fns: Array<(x: any) => any>): ((x: any) => any) =>
   (compose as (...fns: Array<(x: any) => any>) => (x: any) => any)(...fns);
+
+// Registers ops by name only; shape-checking lives at the Op signature
+// and in assemble.ts's chain typing. The fluent method forwards whatever
+// args the call site gives it.
+function wireOps<Ops extends Record<string, Op<any, any, any>>>(
+  target: any,
+  ops: Ops,
+  apply: (op: Op<any, any, any>, args: any[]) => unknown,
+): void {
+  for (const name of Object.keys(ops)) {
+    const opFn = ops[name]!;
+    target[name] = (...args: any[]) => apply(opFn, args);
+  }
+}
 
 function attachBase(target: object, getValue: () => unknown): void {
   Object.defineProperty(target, SURFACE, { value: true });
@@ -59,16 +72,16 @@ function buildSurface(ops: OpMap, spec: SurfaceSpec): any {
 }
 
 // Data-bound surface. `value` is the current raw JSON result.
-export function buildWrapper(
+export function buildBound(
   value: unknown,
   ops: OpMap,
 ): Assembled<Bound<any>> {
   return buildSurface(ops, {
     // Re-enter: reuse another surface's value, or bind raw data as-is.
-    invoke: (input) => buildWrapper(valueOf(input), ops),
+    invoke: (input) => buildBound(valueOf(input), ops),
     getValue: () => value,
-    applyOp: (op, args) => buildWrapper(runOp(op, args, value), ops),
-    spawn: (nextOps) => buildWrapper(value, nextOps),
+    applyOp: (op, args) => buildBound(runOp(op, args, value), ops),
+    spawn: (nextOps) => buildBound(value, nextOps),
     onPipe: (fns) => asComposed(fns)(value),
     composable: false,
   });
@@ -85,7 +98,7 @@ export function buildDeferred(
     buildDeferred([...steps, asComposed(fns)], ops);
   return buildSurface(ops, {
     invoke: (input) =>
-      buildWrapper(
+      buildBound(
         isSurface(input) ? valueOf(input) : runSteps(steps, input),
         ops,
       ),

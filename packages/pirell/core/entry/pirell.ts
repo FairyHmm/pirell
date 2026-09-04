@@ -1,4 +1,4 @@
-import type { Dim } from "../types/types.js";
+import type { Dim } from "../types/base.js";
 
 // Bare data-bound surface: value only, no fluent methods, untyped (shape is
 // a compile-time claim). This is the lean entry for people who don't need

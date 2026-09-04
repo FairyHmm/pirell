@@ -1,4 +1,4 @@
-export * from "./types/types.js";
+export * from "./types/base.js";
 export { pipe, compose } from "./entry/compose.js";
 export { Wrapper } from "./entry/pirell.js";
 export { pirell } from "./entry/assemble.js";
