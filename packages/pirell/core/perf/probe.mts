@@ -42,6 +42,15 @@ const HEAD = [
 // keeping the derived Shape identical. Array data infers to `number[]`
 // regardless of values, so array scenarios are inherently cache demos:
 // their n=1 column is the cold cost, n=50/n=100 show amortization.
+//
+// Stability note (tsc 7 native): cold (n=1) and baseline totals vary
+// run-to-run with machine load and tree-state churn (file create/delete
+// cycles) — swings of ±300 cold / ±4k baseline observed, including
+// impossible-looking negatives. The marginal column ((n100-n50)/50) has
+// held stable across every run and is the ONLY signal to compare.
+// Rules: keep the machine quiet during a run; never create/delete files
+// between A/B measurements (edits preserve directory order, create/delete
+// may not); compare marginals, ignore cold deltas under a few hundred.
 const SCENARIOS: Record<string, (i: string) => string> = {
   // Data-first pipe, shallow branch claim ([["i", number]]). Array data →
   // identical D per call: cold cost + cache behavior.

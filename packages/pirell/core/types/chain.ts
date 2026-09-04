@@ -55,35 +55,27 @@ type ChainEnds<Fns extends readonly unknown[]> =
 export type ComposeGate<Fns extends readonly unknown[], D> = D &
   CheckData<ChainEnds<Fns>[0] extends infer I extends Shape ? I : ["..."], D>;
 
-// One link step: [output value type, output shape]. A thunk link with a
-// declared Op matches against the threaded proven shape and carries FOut
-// forward with zero inference. ShapeOf runs only where no declared shape
-// exists (bare-thunk/plain-fn outputs).
+// One link step: [output value type, output shape, expected tuple
+// element]. A thunk link with a declared Op matches against the threaded
+// proven shape and carries FOut forward with zero inference. ShapeOf runs
+// only where no declared shape exists (bare-thunk/plain-fn outputs).
+// The element rides along so each link is matched once: previously Tail
+// re-matched every link through a separate Link type (IsThunk + Op
+// inference twice per link) to recover what Step had just computed.
 type Step<F, Cur, CurShp extends Shape> =
   IsThunk<F> extends true
     ? F extends Op<infer FIn, infer FOut, infer FArgs>
       ? FArgs extends []
         ? MatchShape<FIn, CurShp> extends true
-          ? [Raw<FOut>, FOut]
+          ? [Raw<FOut>, FOut, Op<FIn, FOut, []>]
           : never
         : never
       : F extends () => (data: any) => infer R
-        ? [R, ShapeOf<R>]
+        ? [R, ShapeOf<R>, F]
         : never
     : F extends (arg: Cur) => infer R
-      ? [R, ShapeOf<R>]
+      ? [R, ShapeOf<R>, (arg: Cur) => R]
       : never;
-
-// Expected tuple element for a link: a zero-arg Op is passed un-invoked,
-// so it stays double-curried; a plain fn is already single-arg.
-type Link<F, Cur, R> =
-  IsThunk<F> extends true
-    ? F extends Op<infer FIn, infer FOut, infer FArgs>
-      ? FArgs extends []
-        ? Op<FIn, FOut, []>
-        : never
-      : F
-    : (arg: Cur) => R;
 
 // Concretely typed links; exported for reuse by assemble.ts's fluent
 // .pipe()/.compose(). Threads the value (Cur) alongside its proven shape
@@ -99,10 +91,10 @@ export type Tail<Fns extends readonly unknown[], Cur, CurShp extends Shape> =
       ? Step<F, Cur, CurShp> extends infer S
         ? S extends never
           ? never
-          : S extends [infer R, infer RShp extends Shape]
+          : S extends [infer R, infer RShp extends Shape, infer L]
             ? Rest extends []
-              ? [Link<F, Cur, R>]
-              : [Link<F, Cur, R>, ...Tail<Rest, R, RShp>]
+              ? [L]
+              : [L, ...Tail<Rest, R, RShp>]
             : never
         : never
       : []
@@ -111,7 +103,9 @@ export type Tail<Fns extends readonly unknown[], Cur, CurShp extends Shape> =
       : never;
 
 // First link keeps its double-curried Op type — the op itself is passed
-// positionally, un-invoked; Tail/Link type the remaining links the same way.
+// positionally, un-invoked; Tail types the remaining links the same way
+// (a first link has no incoming Cur, so it keeps its own arg type while
+// later links are threaded — different positions, not duplication).
 export type ComposeChain<Fns extends readonly unknown[]> =
   IsTuple<Fns> extends true
     ? Fns extends [infer F, ...infer Rest]
