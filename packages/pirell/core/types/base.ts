@@ -65,8 +65,18 @@ export type Raw<S extends Shape> = [unknown] extends [DataOf<S>]
   : DataOf<S> & { readonly [__shapeBrand]?: S };
 
 // Op is always curried: (...args) => (data: DataOf<In>) => Raw<Out>.
-// __pirell brand is gone; thunk-vs-plain-fn discrimination is structural
-// (arity), handled in compose.ts, not nominal — see PLAN.md.
+// Every op's data param carries its own In claim, enforced by ordinary TS
+// parameter-type checking at any call site — type checking, not runtime
+// checking: authoring is a plain JS function plus an annotation, no factory,
+// no wrapper. The strict MatchData lattice (mixed-vs-leaf and friends) still
+// lives at the compose/pipe gate (ComposeGate→CheckData); a future pass will
+// relax compose now that the raw claim is per-function. Detours removed: a
+// checked() wrapper (added an import), a generic <D>-surface Op with a
+// rest-tuple gate (authoring either needed a makeOp factory or lost body
+// typing), and an intersecting generic param (TS decomposes intersection
+// sources during inference; conditional-on-D verdicts were
+// directory-state-sensitive). __pirell brand is gone; thunk-vs-plain-fn
+// discrimination is structural (arity), handled in compose.ts — see PLAN.md.
 export type Op<
   In extends Shape,
   Out extends Shape,

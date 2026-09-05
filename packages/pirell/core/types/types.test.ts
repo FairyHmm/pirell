@@ -2,7 +2,7 @@ import { describe, expectTypeOf, it } from "vitest";
 import type { CheckShape } from "./match-shape.js";
 import type { ShapeOf, DataOf } from "./codec.js";
 import type { MatchData } from "./match-data.js";
-import type { Shape } from "./base.js";
+import type { Raw, Shape } from "./base.js";
 
 // Named-field shapes for testing both acceptance and rejection.
 type UserShape = ["k...", { name: string; age: number }];
@@ -149,9 +149,8 @@ describe("shape inference: ShapeOf", () => {
 // deliberate strictness (MatchData may exceed DataOf, never trail it —
 // otherwise the gate would admit what the body can't handle).
 describe("correspondence: DataOf vs MatchData", () => {
-  type Matches<In extends Shape, D> = MatchData<In, D> extends true
-    ? true
-    : false;
+  type Matches<In extends Shape, D> =
+    MatchData<In, D> extends true ? true : false;
   type Accepts<D, T> = [D] extends [T] ? true : false;
   type Case<In extends Shape, D> = [Matches<In, D>, Accepts<D, DataOf<In>>];
 
@@ -164,9 +163,9 @@ describe("correspondence: DataOf vs MatchData", () => {
     expectTypeOf<Case<[["i", number]], number[]>>().toEqualTypeOf<
       [true, true]
     >();
-    expectTypeOf<Case<[["k", { name: string }]], { user: { name: string } }>>().toEqualTypeOf<
-      [true, true]
-    >();
+    expectTypeOf<
+      Case<[["k", { name: string }]], { user: { name: string } }>
+    >().toEqualTypeOf<[true, true]>();
   });
 
   it("mixed, open, empty, and nested shapes agree on acceptance", () => {
@@ -198,7 +197,9 @@ describe("correspondence: DataOf vs MatchData", () => {
   // Leaf comparison is bidirectional (invariance-like): a tuple is not
   // widened to its element type, even though it extends the array.
   it("leaf invariance is strictly narrower than assignability (do not loosen)", () => {
-    expectTypeOf<Case<[["i", number]], [1, 2]>>().toEqualTypeOf<[false, true]>();
+    expectTypeOf<Case<[["i", number]], [1, 2]>>().toEqualTypeOf<
+      [false, true]
+    >();
   });
 
   // An empty container normalizes to mixed kind (vacuous never), so bare
@@ -206,5 +207,29 @@ describe("correspondence: DataOf vs MatchData", () => {
   // not a regression — pin it so nobody "fixes" the kind rule.
   it("bare claims reject empty containers (do not relax)", () => {
     expectTypeOf<Case<["k"], {}>>().toEqualTypeOf<[false, true]>();
+  });
+
+  // Reflexivity: MatchData<In, DataOf<In>> must hold — the matcher accepts
+  // its own domain, including branded Raw values (brand-blind keyof) and
+  // opaque values at mixed positions (opacity fallback). These failed
+  // before the fixes (toEntries output rejected at ["i","i..."], branded
+  // keyed outputs rejected at ["k"]) while the same chains typechecked
+  // through Tail — the gate trailed DataOf, which the header forbids.
+  it("matcher accepts its own domain, branded or opaque (do not regress)", () => {
+    expectTypeOf<Case<["i", "i..."], unknown[][]>>().toEqualTypeOf<
+      [true, true]
+    >();
+    expectTypeOf<Case<["i", "i..."], Raw<["i", "i..."]>>>().toEqualTypeOf<
+      [true, true]
+    >();
+    expectTypeOf<Case<["k..."], Record<string, unknown>>>().toEqualTypeOf<
+      [true, true]
+    >();
+    expectTypeOf<Case<["k"], Record<string, number>>>().toEqualTypeOf<
+      [true, true]
+    >();
+    expectTypeOf<Case<["k"], Raw<[["k", number]]>>>().toEqualTypeOf<
+      [true, true]
+    >();
   });
 });

@@ -20,13 +20,31 @@ type NormalizeData<D> = D extends readonly (infer E)[]
       uniform: IsUnion<E> extends true ? "mixed" : "leaf";
       value: E;
     }
-  : D extends object
+  : // Keyed values read off string|number keys only: JSON is string-keyed,
+    // and Raw's optional brand is a symbol — without the Extract it pollutes
+    // the value union (flipping uniform to mixed) for branded inputs.
+    D extends object
     ? {
         dim: "k";
-        uniform: IsUnion<D[keyof D]> extends true ? "mixed" : "leaf";
-        value: D[keyof D];
+        uniform: IsUnion<D[Extract<keyof D, string | number>]> extends true
+          ? "mixed"
+          : "leaf";
+        value: D[Extract<keyof D, string | number>];
       }
     : never;
+
+// Unknown is opaque: it proves nothing and disproves nothing. A value
+// involving unknown (directly, or nested in an array/object) can't disprove
+// a mixed ("heterogeneous children") claim, so it satisfies a mixed
+// expectation the uniform check rejects (e.g. toEntries' own unknown[][]
+// output at ["i","i..."]).
+type InvolvesUnknown<V> = [unknown] extends [V]
+  ? true
+  : V extends readonly (infer I)[]
+    ? InvolvesUnknown<I>
+    : V extends object
+      ? InvolvesUnknown<V[Extract<keyof V, string | number>]>
+      : false;
 
 // A consumed Head leaves nothing ([]) or an open tail (["..."]) behind.
 type TailOk<Tail extends Shape> = Tail extends []
@@ -71,7 +89,20 @@ type MatchHead<Head extends Elem, InTail extends Shape, D> = [
       : MatchBranch<Extract<ElemCase<Head>["branch"], Branch>, V> extends true
         ? TailOk<InTail>
         : false
-    : false;
+    : // Opacity fallback (expected-mixed only): re-match on dim alone and
+      // accept opaque values. Mixed-kind continuations never descend (branch
+      // is always never where kind is mixed), so this is exactly TailOk —
+      // and DataOf of a bare-mixed shape accepts every dim-matching D, so it
+      // never admits what the body can't handle.
+      ElemCase<Head>["kind"] extends "mixed"
+      ? [NormalizeData<D>] extends [
+          { dim: ElemCase<Head>["dim"]; value: infer V },
+        ]
+        ? InvolvesUnknown<V> extends true
+          ? TailOk<InTail>
+          : false
+        : false
+      : false;
 
 // Nested Shape recurses without materializing D's own Shape; a leaf type
 // compares structurally (both directions — same strictness as Normalize).
