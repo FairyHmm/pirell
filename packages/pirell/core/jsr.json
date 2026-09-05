@@ -8,6 +8,7 @@
       "**/fixture-ops.ts",
       "perf/**",
       "tsconfig.json",
+      "tsconfig.probe.json",
       "tsdown.config.ts",
       "vitest.config.ts"
     ]

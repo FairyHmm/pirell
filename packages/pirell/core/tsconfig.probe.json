@@ -1,0 +1,17 @@
+{
+  // Probe-only program: library + stress file, no tests — each scenario
+  // pays its own cold (see perf/tsc.ts). Publish-excluded (jsr.json).
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": ".",
+    "noEmit": true
+  },
+  "include": [
+    "**/*.ts",
+    "perf/**/*.mts"
+  ],
+  "exclude": [
+    "**/*.test.ts"
+  ]
+}

@@ -18,6 +18,7 @@ build/
 
 # TypeScript
 *.tsbuildinfo
+*.tmp.ts
 
 # Editor directories and files
 .vscode/*
