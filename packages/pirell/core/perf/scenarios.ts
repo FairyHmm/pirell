@@ -1,137 +1,154 @@
-// Scenario catalog: each entry emits one call-site line and must typecheck
-// with zero errors at any count/length. Object scenarios embed the call
-// index in a same-typed extra key (`k${i}`) so each D is distinct while the
-// derived Shape is identical (tsc caches by type args — identical calls
-// would cost ~the first). Array data always infers `number[]`, so those
-// stay cache demos; direct calls never reach CheckData (only ComposeGate
-// does), so distinct keys don't matter there.
+// Scenario catalog: one topic per (functions, data), three forms each —
+// direct (nested op calls), pipe (data-first gate), wrap (pirell Fluent
+// extend+call) — named <topic>-<form>. Object scenarios embed the call
+// index in a same-typed extra key (`k${i}`) so each D is distinct while
+// the derived Shape is identical. Wrap chains re-wrap through .value
+// (erases the data type — flat marginals even with distinct D).
 
 export const HEAD = [
   'import { pipe, compose } from "../entry/compose.js";',
+  'import { pirell } from "../entry/assemble.js";',
   'import { double, sumAll, toEntries, entriesToObject, flattenEntries, sumValues, stringifyValues } from "../ops/fixture-ops.js";',
 ].join("\n");
 
 export interface Scenario {
   name: string;
   summary: string;
-  /** One call-site line. Fixed-length scenarios ignore `len` (must be ≥1). */
   emit: (i: number, len: number) => string;
-  /** Chain length used by the call-count sweep. */
   defaultLen: number;
-  /** Whether `len` varies meaningfully (included in the length sweep). */
   sweepLen: boolean;
-  /**
-   * Whether the length sweep measures one chain instead of N. True for
-   * cache-demo scenarios (identical calls collapse to a single chain, so
-   * dividing the slope by N would dilute it N×): the slope is the cold
-   * single-chain cost per link, NOT per-link-per-call — do not subtract it
-   * from distinct-D slopes. Cold noise also hits it undiluted, so expect
-   * more run-to-run wobble than distinct-D slopes.
-   */
+  /** True = identical calls cache to one chain (slope is per-chain, not per-link-per-call). */
   sweepPerChain: boolean;
 }
 
-export const SCENARIOS: Scenario[] = [
+// --- Helpers ---
 
-  {
-    name: "direct-op",
-    summary: "Direct op call, no pipe/compose gate. Array data → cache demo.",
-    emit: (i) => `const s${i} = double()([1,2,3]);`,
-    defaultLen: 1,
-    sweepLen: false,
-    sweepPerChain: false,
-  },
-  {
-    name: "direct-obj",
-    summary: "Direct op call on keyed data, distinct D per call.",
-    emit: (i) => `const s${i} = toEntries()({a:1,k${i}:2});`,
-    defaultLen: 1,
-    sweepLen: false,
-    sweepPerChain: false,
-  },
-  {
-    name: "raw-fed",
-    summary:
-      "Prior op's Raw<Out> feeds the next op directly (no ShapeOf on the intermediate). Array data → cache demo.",
-    emit: (i) => `const s${i} = sumAll()(double()([1,2,3]));`,
-    defaultLen: 2,
-    sweepLen: false,
-    sweepPerChain: false,
-  },
-  {
-    name: "pipe-shallow-2",
-    summary: "Data-first pipe, shallow branch claim. Array data → cache demo.",
-    emit: (i) => `const s${i} = pipe([1,2,3], double, sumAll);`,
-    defaultLen: 2,
-    sweepLen: false,
-    sweepPerChain: false,
-  },
-  {
-    // NOTE: sumValues' uniform [["k",number]] output cannot feed
-    // stringifyValues' bare-mixed ["k..."] input (leaf-vs-mixed is a
-    // deliberate rejection) — so the chain exits through toEntries (bare
-    // ["k"] accepts any uniform keyed shape).
-    name: "pipe-deep-2",
-    summary: 'Deep shape (["k",["i",number],"..."]). Distinct D per call.',
-    emit: (i) =>
-      `const s${i} = pipe({a:[1,2],b:[3],k${i}:[4]}, sumValues, toEntries);`,
-    defaultLen: 2,
-    sweepLen: false,
-    sweepPerChain: false,
-  },
-  {
-    name: "compose-gated-2",
-    summary:
-      "Curried compose with the data gate at the inner call. Array data → cache demo.",
-    emit: (i) => `const s${i} = compose(double, sumAll)([1,2,3]);`,
-    defaultLen: 2,
-    sweepLen: false,
-    sweepPerChain: false,
-  },
-  {
-    name: "pipe-chain-4",
-    summary:
-      "Longer chain through entry/exit shape changes. Distinct D per call.",
-    emit: (i) =>
-      `const s${i} = pipe({a:1,b:2,k${i}:3}, toEntries, entriesToObject, toEntries, flattenEntries);`,
-    defaultLen: 4,
-    sweepLen: false,
-    sweepPerChain: false,
-  },
-  {
-    name: "pipe-mixed-1",
-    summary:
-      "Heterogeneous values terminate via the mixed path. Distinct D per call.",
-    emit: (i) => `const s${i} = pipe({a:1,b:"x",k${i}:true}, stringifyValues);`,
-    defaultLen: 1,
-    sweepLen: false,
-    sweepPerChain: false,
-  },
-  {
-    name: "pipe-chain-N",
-    summary:
-      "Length-sweepable chain: toEntries/entriesToObject alternate, valid at any length. Distinct D per call.",
-    emit: (i, len) => {
-      const links = Array.from({ length: len }, (_, k) =>
-        k % 2 === 0 ? "toEntries" : "entriesToObject",
-      );
-      return `const s${i} = pipe({a:1,b:2,k${i}:3}, ${links.join(", ")});`;
+function directChain(data: string, links: string[]): string {
+  let expr = data;
+  for (const l of links) expr = `${l}()(${expr})`;
+  return expr;
+}
+
+function wrapChain(i: number, data: string, links: string[]): string {
+  const lines: string[] = [];
+  let cur = data;
+  let wrap = true;
+  links.forEach((l, k) => {
+    const v = k === links.length - 1 ? `s${i}` : `s${i}_${k}`;
+    lines.push(
+      wrap
+        ? `const ${v} = pirell(${cur}).extend({ ${l} }).${l}();`
+        : `const ${v} = pirell(${cur}.value).extend({ ${l} }).${l}();`,
+    );
+    cur = v;
+    wrap = false;
+  });
+  return lines.join("\n");
+}
+
+function alternatingLinks(len: number): string[] {
+  return Array.from({ length: len }, (_, k) =>
+    k % 2 === 0 ? "toEntries" : "entriesToObject",
+  );
+}
+
+// --- Topic → three forms ---
+
+interface Topic {
+  name: string;
+  data: (i: number) => string;
+  links: string[];
+}
+
+function topicScenarios(t: Topic): Scenario[] {
+  const { name, data, links } = t;
+  return [
+    {
+      name: `${name}-direct`,
+      summary: `Direct ${links.join("→")}.`,
+      emit: (i) => `const s${i} = ${directChain(data(i), links)};`,
+      defaultLen: links.length,
+      sweepLen: false,
+      sweepPerChain: false,
     },
-    defaultLen: 4,
-    sweepLen: true,
-    sweepPerChain: false,
-  },
-  {
-    name: "pipe-sameshape-N",
-    summary:
-      "Same-shape control: double chained len times (shape never changes link to link — isolates one more Tail frame from shape-nesting cost). Array data → cache demo.",
-    emit: (i, len) =>
-      `const s${i} = pipe([1,2,3], ${Array.from({ length: len }, () => "double").join(", ")});`,
-    defaultLen: 4,
-    sweepLen: true,
-    sweepPerChain: true,
-  },
+    {
+      name: `${name}-pipe`,
+      summary: `Pipe ${links.join("→")}.`,
+      emit: (i) => `const s${i} = pipe(${data(i)}, ${links.join(", ")});`,
+      defaultLen: links.length,
+      sweepLen: false,
+      sweepPerChain: false,
+    },
+    {
+      name: `${name}-wrap`,
+      summary: `Wrap ${links.join("→")} via pirell Fluent.`,
+      emit: (i) => wrapChain(i, data(i), links),
+      defaultLen: links.length,
+      sweepLen: false,
+      sweepPerChain: false,
+    },
+  ];
+}
+
+// --- Fixed-length topics ---
+
+const FIXED: Scenario[] = [
+  ...topicScenarios({ name: "single", data: () => "[1,2,3]", links: ["double"] }),
+  ...topicScenarios({ name: "obj", data: (i) => `{a:1,k${i}:2}`, links: ["toEntries"] }),
+  ...topicScenarios({ name: "chain2", data: () => "[1,2,3]", links: ["double", "sumAll"] }),
+  // sumValues→toEntries: sumValues' uniform output feeds toEntries (bare ["k"]).
+  ...topicScenarios({ name: "deep2", data: (i) => `{a:[1,2],b:[3],k${i}:[4]}`, links: ["sumValues", "toEntries"] }),
+  ...topicScenarios({ name: "chain4", data: (i) => `{a:1,b:2,k${i}:3}`, links: ["toEntries", "entriesToObject", "toEntries", "flattenEntries"] }),
+  ...topicScenarios({ name: "mixed1", data: (i) => `{a:1,b:"x",k${i}:true}`, links: ["stringifyValues"] }),
 ];
+
+// --- Length-sweep topics ---
+
+interface SweepTopic {
+  name: string;
+  data: (i: number) => string;
+  links: (len: number) => string[];
+  sweepPerChain: boolean;
+}
+
+function sweepScenarios(t: SweepTopic): Scenario[] {
+  const { name, data, links, sweepPerChain } = t;
+  return [
+    {
+      name: `${name}-direct`,
+      summary: `Direct length-sweepable chain.`,
+      emit: (i, len) => `const s${i} = ${directChain(data(i), links(len))};`,
+      defaultLen: 4,
+      sweepLen: true,
+      sweepPerChain,
+    },
+    {
+      name: `${name}-pipe`,
+      summary: `Pipe length-sweepable chain.`,
+      emit: (i, len) => `const s${i} = pipe(${data(i)}, ${links(len).join(", ")});`,
+      defaultLen: 4,
+      sweepLen: true,
+      sweepPerChain,
+    },
+    {
+      name: `${name}-wrap`,
+      summary: `Wrap length-sweepable chain.`,
+      emit: (i, len) => wrapChain(i, data(i), links(len)),
+      defaultLen: 4,
+      sweepLen: true,
+      sweepPerChain,
+    },
+  ];
+}
+
+const SWEEP: Scenario[] = [
+  ...sweepScenarios({ name: "chainN", data: (i) => `{a:1,b:2,k${i}:3}`, links: alternatingLinks, sweepPerChain: false }),
+  ...sweepScenarios({ name: "sameN", data: () => "[1,2,3]", links: (len) => Array.from({ length: len }, () => "double"), sweepPerChain: true }),
+];
+
+// --- Exported catalog ---
+
+export const SCENARIOS: Scenario[] = [...FIXED, ...SWEEP];
 
 export function findScenario(name: string): Scenario {
   const found = SCENARIOS.find((s) => s.name === name);
@@ -139,19 +156,14 @@ export function findScenario(name: string): Scenario {
   return found;
 }
 
-/** Full stress-file content: shared imports plus the generated body. */
 export function stressFile(body: string): string {
   return `${HEAD}\n${body}\n`;
 }
 
-/** N call sites at the scenario's fixed length (call-count sweep). */
 export function countBody(s: Scenario, n: number): string {
-  return Array.from({ length: n }, (_, i) => s.emit(i, s.defaultLen)).join(
-    "\n",
-  );
+  return Array.from({ length: n }, (_, i) => s.emit(i, s.defaultLen)).join("\n");
 }
 
-/** N call sites with chain length held at `len` (length sweep). */
 export function lengthBody(s: Scenario, n: number, len: number): string {
   return Array.from({ length: n }, (_, i) => s.emit(i, len)).join("\n");
 }

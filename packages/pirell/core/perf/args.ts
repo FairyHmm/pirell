@@ -3,6 +3,7 @@
 export interface Args {
   counts: number[];
   only: Set<string> | null;
+  forms: Set<string> | null;
   chainLengths: number[] | null;
   chainCalls: number;
 }
@@ -10,8 +11,9 @@ export interface Args {
 const USAGE = `Type-cost probe: measures tsc instantiation deltas for synthetic call-site matrices.
 
 Usage: npm run perf [--flags]  (from packages/pirell/core; pnpm/npm need "--" first)
-  --counts 1,50,100       call-site counts per scenario (default "1,50,100")
+  --counts 1,25,50        call-site counts per scenario (default "1,25,50")
   --only a,b              run a subset of scenarios
+  --forms direct,pipe     filter by form (direct, pipe, wrap)
   --chain-lengths 1,4,8   also sweep chain length, holding call sites at --chain-calls
   --chain-calls 60        call sites per length-sweep measurement (default 60)
   -h, --help              print this and exit`;
@@ -25,8 +27,9 @@ function parseIntList(value: string, flag: string, min: number): number[] {
 
 export function parseArgs(argv: string[]): Args {
   const out: Args = {
-    counts: [1, 50, 100],
+    counts: [1, 25, 50],
     only: null,
+    forms: null,
     chainLengths: null,
     chainCalls: 60,
   };
@@ -42,6 +45,7 @@ export function parseArgs(argv: string[]): Args {
     if (
       flag === "--counts" ||
       flag === "--only" ||
+      flag === "--forms" ||
       flag === "--chain-lengths" ||
       flag === "--chain-calls"
     ) {
@@ -54,7 +58,8 @@ export function parseArgs(argv: string[]): Args {
       else if (flag === "--chain-calls") {
         const [n] = parseIntList(value, flag, 1);
         out.chainCalls = n!;
-      } else out.only = new Set(value.split(","));
+      } else if (flag === "--only") out.only = new Set(value.split(","));
+      else out.forms = new Set(value.split(","));
     } else rest.push(arg);
   }
   if (rest.length > 0) throw new Error(`unknown args: ${rest.join(" ")}`);

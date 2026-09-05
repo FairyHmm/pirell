@@ -25,12 +25,14 @@ import { assertTsc, cleanup, measure, tscVersion } from "./tsc.js";
 
 function main(): void {
   assertTsc();
-  const { counts, only, chainLengths, chainCalls } = parseArgs(
+  const { counts, only, forms, chainLengths, chainCalls } = parseArgs(
     process.argv.slice(2),
   );
   if (only) for (const name of only) findScenario(name); // validates names
   const names = SCENARIOS.map((s) => s.name).filter(
-    (n) => !only || only.has(n),
+    (n) =>
+      (!only || only.has(n)) &&
+      (!forms || forms.has(n.slice(n.lastIndexOf("-") + 1))),
   );
   const version = tscVersion();
 
