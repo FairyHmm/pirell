@@ -55,47 +55,48 @@ type ChainEnds<Fns extends readonly unknown[]> =
 export type ComposeGate<Fns extends readonly unknown[], D> = D &
   CheckData<ChainEnds<Fns>[0] extends infer I extends Shape ? I : ["..."], D>;
 
-// One link step: [output value type, output shape, expected tuple
-// element]. A thunk link with a declared Op matches against the threaded
+// One link step, tagged so a mismatch is a distinct shape (`{ok: false}`)
+// rather than a bare `never` a tuple pattern would match vacuously. Tail
+// discriminates on `ok` directly — no separate `extends never` guard
+// needed before destructuring, because the false arm simply doesn't
+// satisfy the `{ok: true, ...}` pattern (measured cheaper per recursion
+// frame than the old bind-then-guard-then-destructure sequence; see
+// PLAN.md). A thunk link with a declared Op matches against the threaded
 // proven shape and carries FOut forward with zero inference. ShapeOf runs
 // only where no declared shape exists (bare-thunk/plain-fn outputs).
-// The element rides along so each link is matched once: previously Tail
-// re-matched every link through a separate Link type (IsThunk + Op
-// inference twice per link) to recover what Step had just computed.
 type Step<F, Cur, CurShp extends Shape> =
   IsThunk<F> extends true
     ? F extends Op<infer FIn, infer FOut, infer FArgs>
       ? FArgs extends []
         ? MatchShape<FIn, CurShp> extends true
-          ? [Raw<FOut>, FOut, Op<FIn, FOut, []>]
-          : never
-        : never
+          ? { ok: true; r: Raw<FOut>; shp: FOut; l: Op<FIn, FOut, []> }
+          : { ok: false }
+        : { ok: false }
       : F extends () => (data: any) => infer R
-        ? [R, ShapeOf<R>, F]
-        : never
+        ? { ok: true; r: R; shp: ShapeOf<R>; l: F }
+        : { ok: false }
     : F extends (arg: Cur) => infer R
-      ? [R, ShapeOf<R>, (arg: Cur) => R]
-      : never;
+      ? { ok: true; r: R; shp: ShapeOf<R>; l: (arg: Cur) => R }
+      : { ok: false };
 
 // Concretely typed links; exported for reuse by assemble.ts's fluent
 // .pipe()/.compose(). Threads the value (Cur) alongside its proven shape
-// (CurShp). Step is evaluated once, bound as S: `S extends never` stays a
-// naked-param check, so a never Step still propagates instead of matching
-// [infer R, ...] vacuously (never is assignable to everything).
-// Non-tuple (spread) chains keep each link's own signature — length is
-// unknown so per-link threading is impossible; spreads are unchecked by
-// design (see compose.test.ts), same as ComposeChain's non-tuple arm.
+// (CurShp). Non-tuple (spread) chains keep each link's own signature —
+// length is unknown so per-link threading is impossible; spreads are
+// unchecked by design (see compose.test.ts), same as ComposeChain's
+// non-tuple arm.
 export type Tail<Fns extends readonly unknown[], Cur, CurShp extends Shape> =
   IsTuple<Fns> extends true
     ? Fns extends [infer F, ...infer Rest]
-      ? Step<F, Cur, CurShp> extends infer S
-        ? S extends never
-          ? never
-          : S extends [infer R, infer RShp extends Shape, infer L]
-            ? Rest extends []
-              ? [L]
-              : [L, ...Tail<Rest, R, RShp>]
-            : never
+      ? Step<F, Cur, CurShp> extends {
+          ok: true;
+          r: infer R;
+          shp: infer RShp extends Shape;
+          l: infer L;
+        }
+        ? Rest extends []
+          ? [L]
+          : [L, ...Tail<Rest, R, RShp>]
         : never
       : []
     : Fns extends Array<infer F>
