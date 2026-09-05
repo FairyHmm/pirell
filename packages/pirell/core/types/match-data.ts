@@ -55,22 +55,22 @@ type MatchHead<Head extends Elem, InTail extends Shape, D> = [
   ElemCase<Head>,
 ] extends [never]
   ? false
-  : ElemCase<Head> extends {
-        dim: infer HDim;
-        kind: infer HKind;
-        branch: infer Br;
-      }
-    ? [NormalizeData<D>] extends [{ dim: HDim; uniform: HKind; value: infer V }]
-      ? [Br] extends [never]
-        ? HKind extends "mixed"
-          ? TailOk<InTail>
-          : TailOk<InTail> extends true
-            ? true
-            : MatchData<InTail, V>
-        : MatchBranch<Extract<Br, Branch>, V> extends true
-          ? TailOk<InTail>
-          : false
-      : false
+  : [NormalizeData<D>] extends [
+        {
+          dim: ElemCase<Head>["dim"];
+          uniform: ElemCase<Head>["kind"];
+          value: infer V;
+        },
+      ]
+    ? [ElemCase<Head>["branch"]] extends [never]
+      ? ElemCase<Head>["kind"] extends "mixed"
+        ? TailOk<InTail>
+        : TailOk<InTail> extends true
+          ? true
+          : MatchData<InTail, V>
+      : MatchBranch<Extract<ElemCase<Head>["branch"], Branch>, V> extends true
+        ? TailOk<InTail>
+        : false
     : false;
 
 // Nested Shape recurses without materializing D's own Shape; a leaf type
