@@ -5,10 +5,10 @@
 import {
   type Scenario,
   alternatingLinks,
-  directChain,
+  findScenario,
   lengthBody,
   stressFile,
-  wrapChain,
+  sweepScenarios,
 } from "./scenarios.js";
 import {
   assertAndVersion,
@@ -22,123 +22,37 @@ import {
   renderTable,
 } from "./utils.js";
 
-interface Topic {
-  name: string;
-  data: (i: number) => string;
-  links: string[];
-}
-
-function topicScenarios(t: Topic): Scenario[] {
-  const { name, data, links } = t;
-  return [
+const SCENARIOS: Scenario[] = [
+  // Sweepable chains only (slopes are the signal). Fixed two-link chains
+  // add nothing here — their emit ignores len, so each length compiles
+  // the same file three times.
+  ...sweepScenarios(
     {
-      name: `${name}-direct`,
-      summary: `Direct ${links.join("→")}.`,
-      emit: (i) => `const s${i} = ${directChain(data(i), links)};`,
-      defaultLen: links.length,
-      sweepLen: false,
+      name: "alternating",
+      data: (i) => `{a:1,b:2,k${i}:3}`,
+      links: alternatingLinks,
       sweepPerChain: false,
     },
-    {
-      name: `${name}-pipe`,
-      summary: `Pipe ${links.join("→")}.`,
-      emit: (i) => `const s${i} = pipe(${data(i)}, ${links.join(", ")});`,
-      defaultLen: links.length,
-      sweepLen: false,
-      sweepPerChain: false,
-    },
-    {
-      name: `${name}-wrap`,
-      summary: `Wrap ${links.join("→")} via pirell Fluent.`,
-      emit: (i) => wrapChain(i, data(i), links),
-      defaultLen: links.length,
-      sweepLen: false,
-      sweepPerChain: false,
-    },
-  ];
-}
-
-interface SweepTopic {
-  name: string;
-  data: (i: number) => string;
-  links: (len: number) => string[];
-  sweepPerChain: boolean;
-}
-
-function sweepScenarios(t: SweepTopic): Scenario[] {
-  const { name, data, links, sweepPerChain } = t;
-  return [
-    {
-      name: `${name}-direct`,
-      summary: `Direct length-sweepable chain.`,
-      emit: (i, len) => `const s${i} = ${directChain(data(i), links(len))};`,
-      defaultLen: 4,
-      sweepLen: true,
-      sweepPerChain,
-    },
-    {
-      name: `${name}-pipe`,
-      summary: `Pipe length-sweepable chain.`,
-      emit: (i, len) =>
-        `const s${i} = pipe(${data(i)}, ${links(len).join(", ")});`,
-      defaultLen: 4,
-      sweepLen: true,
-      sweepPerChain,
-    },
-    {
-      name: `${name}-wrap`,
-      summary: `Wrap length-sweepable chain.`,
-      emit: (i, len) => wrapChain(i, data(i), links(len)),
-      defaultLen: 4,
-      sweepLen: true,
-      sweepPerChain,
-    },
-  ];
-}
-
-const FIXED: Scenario[] = [
-  ...topicScenarios({
-    name: "chain2",
-    data: () => "[1,2,3]",
-    links: ["double", "sumAll"],
-  }),
-  ...topicScenarios({
-    name: "deep2",
-    data: (i) => `{a:[1,2],b:[3],k${i}:[4]}`,
-    links: ["sumValues", "toEntries"],
-  }),
-];
-
-const SWEEP: Scenario[] = [
-  ...sweepScenarios({
-    name: "alternating",
-    data: (i) => `{a:1,b:2,k${i}:3}`,
-    links: alternatingLinks,
-    sweepPerChain: false,
-  }),
+    ["pipe", "wrap"],
+  ),
   // Same op repeated, caches to one chain (per-chain slope).
-  ...sweepScenarios({
-    name: "same-op",
-    data: () => "[1,2,3]",
-    links: (len) => Array.from({ length: len }, () => "double"),
-    sweepPerChain: true,
-  }),
+  ...sweepScenarios(
+    {
+      name: "same-op",
+      data: () => "[1,2,3]",
+      links: (len) => Array.from({ length: len }, () => "double"),
+      sweepPerChain: true,
+    },
+    ["pipe", "wrap"],
+  ),
 ];
-
-const SCENARIOS: Scenario[] = [...FIXED, ...SWEEP];
-
-function findScenario(name: string): Scenario {
-  const found = SCENARIOS.find((s) => s.name === name);
-  if (!found) throw new Error(`unknown scenario: ${name}`);
-  return found;
-}
 
 function main(): void {
   const version = assertAndVersion();
   const { only, forms, chainLengths, chainCalls } = parseArgs(
     process.argv.slice(2),
   );
-  if (only) for (const name of only) findScenario(name);
+  if (only) for (const name of only) findScenario(SCENARIOS, name);
   const names = SCENARIOS.map((s) => s.name).filter(
     (n) =>
       (!only || only.has(n)) &&
@@ -155,7 +69,7 @@ function main(): void {
     console.log(`Length sweep (call sites held at ${chainCalls}):`);
     const rows: string[][] = [];
     for (const name of names) {
-      const s = findScenario(name);
+      const s = findScenario(SCENARIOS, name);
       const results: Measurement[] = chainLengths.map((len: number) =>
         measure(stressFile(lengthBody(s, chainCalls, len))),
       );
@@ -174,7 +88,7 @@ function main(): void {
     if (rows.length > 0)
       console.log(renderTable(lengthsHead(chainLengths, chainCalls), rows));
     const perChain = names
-      .map(findScenario)
+      .map((n) => findScenario(SCENARIOS, n))
       .filter((s) => s.sweepPerChain)
       .map((s) => s.name);
     if (perChain.length > 0)

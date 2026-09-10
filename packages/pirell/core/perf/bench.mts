@@ -34,17 +34,17 @@ const OBJ = { a: 1, b: 2 };
 
 const CASES: Case[] = [
   {
-    name: "single-direct",
+    name: "arr-direct",
     headline: true,
     run: () => double()([...SMALL_ARR] as unknown as number[]),
   },
   {
-    name: "single-pipe",
+    name: "arr-pipe",
     headline: true,
     run: () => pipe([...SMALL_ARR] as unknown as number[], double),
   },
   {
-    name: "single-wrap",
+    name: "arr-wrap",
     headline: true,
     run: () =>
       pirell([...SMALL_ARR] as unknown as number[])
@@ -160,9 +160,9 @@ const ratio = (a?: number, b?: number): string =>
   a !== undefined && b !== undefined && b > 0 ? `${(a / b).toFixed(0)}×` : "—";
 if (!only)
   console.log(
-    `wrap:pipe  single ${ratio(mins.get("single-wrap"), mins.get("single-pipe"))}` +
-      `  chain2 ${ratio(mins.get("chain2-wrap"), mins.get("single-pipe"))}` +
-      `  obj ${ratio(mins.get("obj-wrap"), mins.get("single-pipe"))}` +
+    `wrap:pipe  arr ${ratio(mins.get("arr-wrap"), mins.get("arr-pipe"))}` +
+      `  chain2 ${ratio(mins.get("chain2-wrap"), mins.get("arr-pipe"))}` +
+      `  obj ${ratio(mins.get("obj-wrap"), mins.get("arr-pipe"))}` +
       `  big ${ratio(mins.get("big-wrap"), mins.get("big-direct"))}`,
   );
 console.log(`(sink: ${typeof sink})`);

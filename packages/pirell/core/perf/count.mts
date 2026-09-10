@@ -4,9 +4,11 @@
 
 import {
   type Scenario,
+  type Topic,
   countBody,
-  directChain,
+  findScenario,
   stressFile,
+  topicScenarios,
   wrapChain,
 } from "./scenarios.js";
 import {
@@ -20,44 +22,9 @@ import {
   renderTable,
 } from "./utils.js";
 
-interface Topic {
-  name: string;
-  data: (i: number) => string;
-  links: string[];
-}
-
-function topicScenarios(t: Topic): Scenario[] {
-  const { name, data, links } = t;
-  return [
-    {
-      name: `${name}-direct`,
-      summary: `Direct ${links.join("→")}.`,
-      emit: (i) => `const s${i} = ${directChain(data(i), links)};`,
-      defaultLen: links.length,
-      sweepLen: false,
-      sweepPerChain: false,
-    },
-    {
-      name: `${name}-pipe`,
-      summary: `Pipe ${links.join("→")}.`,
-      emit: (i) => `const s${i} = pipe(${data(i)}, ${links.join(", ")});`,
-      defaultLen: links.length,
-      sweepLen: false,
-      sweepPerChain: false,
-    },
-    {
-      name: `${name}-wrap`,
-      summary: `Wrap ${links.join("→")} via pirell Fluent.`,
-      emit: (i) => wrapChain(i, data(i), links),
-      defaultLen: links.length,
-      sweepLen: false,
-      sweepPerChain: false,
-    },
-  ];
-}
-
-// Wrap breakdown: isolate pirell-only, pirell+extend, pirell+extend+call
-// to show how the wrap marginal distributes across the surface lifecycle.
+// Wrap breakdown: pirell-only and pirell+extend prefixes of the -wrap
+// chain (the call step is -wrap itself — a separate -call scenario ran
+// byte-identical chains, so it measured twice, not more).
 function wrapBreakdown(t: Topic): Scenario[] {
   const { name, data, links } = t;
   return [
@@ -77,14 +44,6 @@ function wrapBreakdown(t: Topic): Scenario[] {
       sweepLen: false,
       sweepPerChain: false,
     },
-    {
-      name: `${name}-call`,
-      summary: `pirell(data).extend({...}).op() — pirell + extend + call (no .value).`,
-      emit: (i) => `const s${i} = pirell(${data(i)}).extend({ ${links[0]} }).${links[0]}();`,
-      defaultLen: 1,
-      sweepLen: false,
-      sweepPerChain: false,
-    },
   ];
 }
 
@@ -95,7 +54,7 @@ function sharedDeferredBreakdown(t: Topic): Scenario {
   const { name, data, links } = t;
   const op = links[0];
   return {
-    name: `${name}-shared`,
+    name: `${name}-wrap`,
     summary: `pirell().extend({...}) ONCE, then N downstream .op() calls (no re-extend).`,
     emit: (i) => {
       const decl =
@@ -114,7 +73,7 @@ const STABLE_PREFIX = "interface Row { a: number; k: number; }";
 
 const stableBreakdown: Scenario[] = [
   {
-    name: "obj-stable",
+    name: "stable-wrap",
     summary: `Named interface Row (not inline literal) → toEntries.`,
     emit: (i) => {
       const v = `r${i}`;
@@ -125,7 +84,7 @@ const stableBreakdown: Scenario[] = [
     sweepPerChain: false,
   },
   {
-    name: "obj-stable-pirell",
+    name: "stable-pirell",
     summary: `Named interface Row, pirell only.`,
     emit: (i) => {
       const v = `r${i}`;
@@ -138,64 +97,98 @@ const stableBreakdown: Scenario[] = [
 ];
 
 const SCENARIOS: Scenario[] = [
-  ...wrapBreakdown({
-    name: "single",
-    data: () => "[1,2,3]",
-    links: ["double"],
-  }),
-  ...topicScenarios({
-    name: "single",
-    data: () => "[1,2,3]",
-    links: ["double"],
-  }),
-  // Shared-Deferred-call: .extend() hoisted, distinct data(i) per site —
-  // each invocation a genuine call site, only extension shared.
+  // arr (array baseline): pipe pins the free form, wrap is the headline.
+  // No breakdown — pirell is 0 (cached number[]) and extend is the same
+  // +8 constant obj-extend already pins.
+  ...topicScenarios(
+    {
+      name: "arr",
+      data: () => "[1,2,3]",
+      links: ["double"],
+    },
+    ["pipe", "wrap"],
+  ),
+  // Special case (regression pin, not a headline): .extend() hoisted,
+  // distinct data(i) per site — only extension shared.
   sharedDeferredBreakdown({
-    name: "single",
+    name: "shared",
     data: (i) => `[1,2,${i}]`,
     links: ["double"],
   }),
+  // obj (uniform object headline) + the one full decomposition.
   ...wrapBreakdown({
     name: "obj",
     data: (i) => `{a:1,k${i}:2}`,
     links: ["toEntries"],
   }),
-  ...topicScenarios({
-    name: "obj",
-    data: (i) => `{a:1,k${i}:2}`,
-    links: ["toEntries"],
-  }),
-  // 3-key uniform control: separates key-count effect from
-  // mixed-values effect vs mixed1.
-  ...topicScenarios({
-    name: "obj3-u",
-    data: (i) => `{a:1,b:2,k${i}:3}`,
-    links: ["toEntries"],
-  }),
-  ...wrapBreakdown({
-    name: "mixed1",
-    data: (i) => `{a:1,b:"x",k${i}:true}`,
-    links: ["stringifyValues"],
-  }),
-  ...topicScenarios({
-    name: "mixed1",
-    data: (i) => `{a:1,b:"x",k${i}:true}`,
-    links: ["stringifyValues"],
-  }),
-  // Stable-type demo: usage-side reachability of the freshness floor.
+  ...topicScenarios(
+    {
+      name: "obj",
+      data: (i) => `{a:1,k${i}:2}`,
+      links: ["toEntries"],
+    },
+    ["wrap"],
+  ),
+  // Control (not a headline): 3-key uniform separates key-count effect
+  // from mixed-values effect vs objmix.
+  ...topicScenarios(
+    {
+      name: "obj3",
+      data: (i) => `{a:1,b:2,k${i}:3}`,
+      links: ["toEntries"],
+    },
+    ["wrap"],
+  ),
+  // objmix (mixed object headline). No breakdown — same structure as
+  // obj's; the wrap marginal carries the comparison.
+  ...topicScenarios(
+    {
+      name: "objmix",
+      data: (i) => `{a:1,b:"x",k${i}:true}`,
+      links: ["stringifyValues"],
+    },
+    ["wrap"],
+  ),
+  // arrmix (heterogeneous array → i...): the one shape kind with no
+  // scenario before mixedLength.
+  ...topicScenarios(
+    {
+      name: "arrmix",
+      data: (i) => `[1,"x",${i}]`,
+      links: ["mixedLength"],
+    },
+    ["wrap"],
+  ),
+  // objnest (uniform nested arrays → sumValues' open-tail In): "..."
+  // claim coverage in count mode (deep2 covers it in length mode).
+  ...topicScenarios(
+    {
+      name: "objnest",
+      data: (i) => `{a:[1,2],b:[3],k${i}:[4]}`,
+      links: ["sumValues"],
+    },
+    ["wrap"],
+  ),
+  // arrnth (bare-i claim via args): pipe only — direct is structurally
+  // zero and Fluent's call type is 0-arg, so arg-taking ops have no
+  // wrap form.
+  {
+    name: "arrnth-pipe",
+    summary: `Pipe ([1,2,3], nth(i)) with varying arg.`,
+    emit: (i) => `const s${i} = pipe([1,2,3], nth(${i % 3}));`,
+    defaultLen: 1,
+    sweepLen: false,
+    sweepPerChain: false,
+  },
+  // Recommended usage pattern (not a chain): named types zero the pirell
+  // share — the freshness floor, reachable with no core change.
   ...stableBreakdown,
 ];
-
-function findScenario(name: string): Scenario {
-  const found = SCENARIOS.find((s) => s.name === name);
-  if (!found) throw new Error(`unknown scenario: ${name}`);
-  return found;
-}
 
 function main(): void {
   const version = assertAndVersion();
   const { counts, only, forms } = parseArgs(process.argv.slice(2));
-  if (only) for (const name of only) findScenario(name);
+  if (only) for (const name of only) findScenario(SCENARIOS, name);
   const names = SCENARIOS.map((s) => s.name).filter(
     (n) =>
       (!only || only.has(n)) &&
@@ -211,8 +204,8 @@ function main(): void {
     );
     const rows: string[][] = [];
     for (const name of names) {
-      const s = findScenario(name);
-      const isStable = s.name.startsWith("obj-stable");
+      const s = findScenario(SCENARIOS, name);
+      const isStable = s.name.startsWith("stable-");
       const body = isStable
         ? `${STABLE_PREFIX}\n${countBody(s, counts[counts.length - 1]!)}`
         : countBody(s, counts[counts.length - 1]!);

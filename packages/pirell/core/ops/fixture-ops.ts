@@ -34,6 +34,11 @@ export const stringifyValues: Op<["k..."], [["k", string]]> =
   () => (data) =>
     Object.fromEntries(Object.entries(data).map(([k, v]) => [k, String(v)]));
 
+// In is honestly heterogeneous ("i..."); Out is uniform (length is
+// always number). Only fixture op claiming a bare mixed-array tag.
+export const mixedLength: Op<["i..."], []> =
+  () => (data) => data.length;
+
 // Parameterized op: the argument lives in Op's own Args slot, exercising a
 // parameterized op as a chain link.
 export const nth: Op<["i"], [], [i: number]> =
