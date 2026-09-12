@@ -65,6 +65,36 @@ describe("shape matching: CheckShape", () => {
     expectTypeOf<Result>().toEqualTypeOf<never>();
   });
 
+  it("bare mixed In accepts a detailed same-dim Actual", () => {
+    type Result = CheckShape<
+      ["k..."],
+      [["k", { status: string; amount: number }]]
+    >;
+    expectTypeOf<Result>().toEqualTypeOf<
+      [["k", { status: string; amount: number }]]
+    >();
+  });
+
+  it("bare mixed In accepts detailed same-dim Actuals, uniform or not", () => {
+    // Detail is information: uniform-leaf and per-key branches both
+    // satisfy a claim that only names dim+heterogeneity. Bare uniform
+    // Actuals (nothing known) stay rejected — see next pin.
+    type Detailed = CheckShape<
+      ["k..."],
+      [["k", { status: string; amount: number }]]
+    >;
+    expectTypeOf<Detailed>().toEqualTypeOf<
+      [["k", { status: string; amount: number }]]
+    >();
+    type UniformBranch = CheckShape<["k..."], [["k", number]]>;
+    expectTypeOf<UniformBranch>().toEqualTypeOf<[["k", number]]>();
+  });
+
+  it("bare mixed In still rejects a bare uniform Actual", () => {
+    type BareActual = CheckShape<["k..."], ["k"]>;
+    expectTypeOf<BareActual>().toEqualTypeOf<never>();
+  });
+
   it("bare In accepts a Variants-declared mixed Actual of the same dim", () => {
     type Result = CheckShape<["i..."], [["i...", [string, number]]]>;
     expectTypeOf<Result>().toEqualTypeOf<[["i...", [string, number]]]>();
@@ -114,6 +144,30 @@ describe("shape inference: ShapeOf", () => {
   it("unknown-valued object stays opaque (no Branch, no crash)", () => {
     type Result = ShapeOf<Record<string, unknown>>;
     expectTypeOf<Result>().toEqualTypeOf<["k"]>();
+  });
+
+  it("heterogeneous leaf rows derive per-key detail, not the mixed tag", () => {
+    type Result = ShapeOf<{ status: string; amount: number }>;
+    expectTypeOf<Result>().toEqualTypeOf<
+      [["k", { status: string; amount: number }]]
+    >();
+  });
+
+  it("array of heterogeneous rows derives a Table-shaped structure", () => {
+    type Result = ShapeOf<{ status: string; amount: number }[]>;
+    expectTypeOf<Result>().toEqualTypeOf<
+      ["i", ["k", { status: string; amount: number }]]
+    >();
+  });
+
+  it("a bare Table claim accepts the derived heterogeneous rows", () => {
+    type Result = CheckShape<
+      ["i", "k", "..."],
+      ["i", ["k", { status: string; amount: number }]]
+    >;
+    expectTypeOf<Result>().toEqualTypeOf<
+      ["i", ["k", { status: string; amount: number }]]
+    >();
   });
 
   // Regression: Raw's optional brand vacuously matches index-signature

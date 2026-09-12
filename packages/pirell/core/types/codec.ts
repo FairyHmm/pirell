@@ -94,12 +94,16 @@ type ShapeOfElem<D> = D extends readonly (infer E)[]
       : ["i", ...ContainerTail<E>]
   // Uniform-first: concrete-leaf before union, so the common case
   // skips IsUnion entirely.
+  // Fixed heterogeneous leaf rows are tables, not mixed: per-key detail
+  // matches bare claims via the welcome rule, so no matcher change.
   : D extends object
     ? IsConcreteLeaf<D[keyof D]> extends true
       ? [["k", D[keyof D]]]
-      : IsUnion<D[keyof D]> extends true
-        ? ["k..."]
-        : ["k", ...ContainerTail<D[keyof D]>]
+      : D[keyof D] extends string | number | boolean
+        ? [["k", D]]
+        : IsUnion<D[keyof D]> extends true
+          ? ["k..."]
+          : ["k", ...ContainerTail<D[keyof D]>]
     : [];
 
 type ContainerTail<E> = [unknown] extends [E]

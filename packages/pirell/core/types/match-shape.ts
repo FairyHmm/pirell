@@ -1,8 +1,8 @@
 import type { Elem, ElemCase, Shape } from "./base.js";
 
-// Single-direction: Actual must extend In. Bare InE claims only dim+kind;
-// declared InE compares its payload arm. Elem is closed — new arms must
-// not subtype existing ones.
+// Single-direction: Actual must extend In. Bare dim or mixed claims
+// accept detailed same-dim Actuals; declared arms compare payloads.
+// Bare uniform Actuals stay rejected by mixed claims.
 type MatchElem<InE extends Elem, ActualE extends Elem> =
   ElemCase<ActualE>["dim"] extends ElemCase<InE>["dim"]
     ? ElemCase<ActualE>["kind"] extends ElemCase<InE>["kind"]
@@ -19,7 +19,13 @@ type MatchElem<InE extends Elem, ActualE extends Elem> =
           : ElemCase<ActualE>["branch"] extends ElemCase<InE>["branch"]
             ? true
             : false
-      : false
+      : [ElemCase<InE>["kind"]] extends ["mixed"]
+        ? [ElemCase<InE>["variants"]] extends [never]
+          ? [ElemCase<ActualE>["branch"]] extends [never]
+            ? false
+            : true
+          : false
+        : false
     : false;
 
 // "..." isn't an Elem, so its check precedes the Head/Tail destructure.
