@@ -1,0 +1,17 @@
+{
+  "name": "@pirell/core",
+  "version": "0.1.0",
+  "exports": "./index.ts",
+  "publish": {
+    "exclude": [
+      "**/*.test.ts",
+      "**/fixture-ops.ts",
+      "perf/**",
+      "tsconfig.json",
+      "tsconfig.probe.json",
+      "tsdown.config.ts",
+      "vitest.config.ts"
+    ]
+  },
+  "license": "ISC"
+}
