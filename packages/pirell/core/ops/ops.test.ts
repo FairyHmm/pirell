@@ -4,9 +4,7 @@ import { compose } from "../entry/compose.js";
 import {
   double,
   sumAll,
-  toEntries,
-  flattenEntries,
-  sumValues,
+  nth,
 } from "./fixture-ops.js";
 
 // makeFlat/makeCurry flip calling convention with no shape knowledge —
@@ -50,7 +48,7 @@ describe("makeCurry: flat (data, ...args) => result → curried", () => {
     // narrows it with an explicit cast, which is the op seam, not curry's.
     const afterSum = (data: number, label: string) => `${label}:${data}`;
     const curried = makeCurry(afterSum);
-    const total = sumAll()([1, 2, 3]) as number;
+    const total = sumAll([1, 2, 3]) as number;
     expect(curried("total")(total)).toBe("total:6");
   });
 });
@@ -92,37 +90,17 @@ describe("makeFlat: curried (...args) => (data) => result → flat", () => {
   });
 });
 
-describe("makeFlat on native pirell Ops (curried (data) => raw)", () => {
-  it("flattens a zero-arg Op to the data-first call", () => {
-    const flat = makeFlat(double);
-    expect(flat([1, 2, 3])).toEqual([2, 4, 6]);
+describe("makeFlat on native pirell ops (factories → flat)", () => {
+  it("flattens a factory op into a data-first call", () => {
+    const flat = makeFlat(nth);
+    expect(flat([10, 20, 30], 1)).toBe(20);
   });
 
-  it("flattens sumAll to the data-first call", () => {
-    const flat = makeFlat(sumAll);
-    expect(flat([1, 2, 3])).toBe(6);
-  });
-
-  it("flattens toEntries into a data-first call on an object", () => {
-    const flat = makeFlat(toEntries);
-    expect(flat({ a: 1, b: 2 })).toEqual([
-      ["a", 1],
-      ["b", 2],
-    ]);
-  });
-
-  it("flattens flattenEntries into a data-first call", () => {
-    const flat = makeFlat(flattenEntries);
-    expect(
-      flat([
-        ["a", 1],
-        ["b", 2],
-      ]),
-    ).toEqual([1, 2]);
-  });
-
-  it("flattens a depth-shaped Op (sumValues)", () => {
-    const flat = makeFlat(sumValues);
-    expect(flat({ a: [1, 2], b: [3] })).toEqual({ a: 3, b: 3 });
+  it("a flattened factory still rejects wrong args", () => {
+    const flat = makeFlat(nth);
+    if (false) {
+      // @ts-expect-error -- flat(data, arg) — string isn't a number arg
+      flat([1, 2, 3], "x");
+    }
   });
 });

@@ -117,7 +117,7 @@ export function findScenario(
 
 export function directChain(data: string, links: string[]): string {
   let expr = data;
-  for (const l of links) expr = `${l}()(${expr})`;
+  for (const l of links) expr = `${l}(${expr})`;
   return expr;
 }
 

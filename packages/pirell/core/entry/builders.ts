@@ -1,20 +1,24 @@
 import { composeRaw } from "./compose.js";
 import { SURFACE, isSurface, valueOf } from "./surface.js";
-import type { Bound, Deferred, Op } from "../types/base.js";
+import type { Bound, Deferred, OpLike } from "../types/base.js";
 import type { Assembled, OpMap } from "./assemble.js";
 
 // Runtime surface builders (companion to assemble.ts, which owns the
 // surface types). One shared assembly sequence; the two surface kinds
 // differ only in what each step means (eager vs lazy).
 
-// Ops are uniformly curried: apply args now, data when it arrives.
-const runOp = (op: Op<any, any, any>, args: any[], data: unknown): unknown =>
-  (op as unknown as (...a: any[]) => (data: unknown) => unknown)(...args)(data);
+// Ops are data fns; factories are applied to args first. The call's own
+// args decide (a factory must be applied to yield its data stage, a
+// plain op already is that stage).
+const runOp = (op: OpLike, args: any[], data: unknown): unknown =>
+  args.length === 0
+    ? (op as (data: unknown) => unknown)(data)
+    : (op as (...a: any[]) => (data: unknown) => unknown)(...args)(data);
 
 type SurfaceSpec = {
   invoke: (input: unknown) => unknown;
   getValue: () => unknown;
-  applyOp: (op: Op<any, any, any>, args: any[]) => unknown;
+  applyOp: (op: OpLike, args: any[]) => unknown;
   spawn: (ops: OpMap) => unknown;
   onPipe: (fns: Array<(x: any) => any>) => unknown;
   composable: boolean;

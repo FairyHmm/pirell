@@ -34,8 +34,8 @@ describe("standalone extend()", () => {
   it("rejects a parameterized op at the type level", () => {
     // Type check only — never runs (would throw at runtime too, see below).
     if (false) {
-      // @ts-expect-error -- nth has Args=[number]; extend(fn) only accepts
-      // Args=[] since it calls fn() with no arguments to reach (data) => R.
+      // @ts-expect-error -- nth is a factory (returns a data fn), and
+      // extend(fn) only accepts single-stage data ops.
       extend(nth);
     }
   });

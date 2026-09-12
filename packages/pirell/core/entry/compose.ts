@@ -8,8 +8,9 @@ import { makeFlat } from "../ops/ops.js";
 // Untyped runtime shared by typed compose below and the surface builders.
 // Stage-invoke + stage-error contract lives here exactly once.
 export function composeRaw(...fns: Array<(x: any) => any>): (x: any) => any {
-  // A zero-arg Op arrives curried — one extra call yields the (data) => R
-  // stage; a bare fn is already that stage.
+  // A zero-arg thunk link is applied once to reach its (data) => R
+  // stage; a data fn (op or pre-applied factory product) already is
+  // that stage.
   const stages = fns.map((fn) => (fn.length === 0 ? (fn as () => any)() : fn));
   return (x: any) =>
     stages.reduce((acc, fn, i) => {

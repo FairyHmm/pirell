@@ -5,7 +5,8 @@ import { describe, it, expect } from "vitest";
 import type { Op } from "../index.js";
 import { extend, pirell } from "../index.js";
 
-// Bodies are plain curried fns; the as-cast supplies the Op<...> shapes.
+// Bodies are factories returning data fns; the as-cast supplies the
+// Op<...> shapes on the product.
 // groupBy partitions keyed rows.
 const groupBy = ((key: string) => (data: unknown) => {
   const rows = data as Record<string, unknown>[];
@@ -15,16 +16,16 @@ const groupBy = ((key: string) => (data: unknown) => {
     (groups[k] ||= []).push(row);
   }
   return groups;
-}) as unknown as Op<["i", "k", "..."], ["k", "i", "k", "..."], [key: string]>;
+}) as unknown as (key: string) => Op<["i", "k", "..."], ["k", "i", "k", "..."]>;
 
 // A second user op sharing the same registration path.
 const sum = ((key: string) => (data: unknown) => {
   const rows = data as Record<string, unknown>[];
   return rows.reduce((acc, row) => acc + Number(row[key]), 0);
-}) as unknown as Op<["i", "k", "..."], [], [key: string]>;
+}) as unknown as (key: string) => Op<["i", "k", "..."], []>;
 
 describe("recreating the library through the public API", () => {
-  it("an Op is curried — call args then data", () => {
+  it("a parameterized op is a factory — apply args, then data", () => {
     const ORDERS = [{ status: "paid" }, { status: "open" }, { status: "paid" }];
     expect(groupBy("status")(ORDERS)).toEqual({
       paid: [{ status: "paid" }, { status: "paid" }],

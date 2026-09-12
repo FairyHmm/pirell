@@ -36,7 +36,7 @@ const CASES: Case[] = [
   {
     name: "arr-direct",
     headline: true,
-    run: () => double()([...SMALL_ARR] as unknown as number[]),
+    run: () => double([...SMALL_ARR] as unknown as number[]),
   },
   {
     name: "arr-pipe",
@@ -54,7 +54,7 @@ const CASES: Case[] = [
   {
     name: "chain2-direct",
     headline: false,
-    run: () => sumAll()(double()([...SMALL_ARR] as unknown as number[])),
+    run: () => sumAll(double([...SMALL_ARR] as unknown as number[])),
   },
   {
     name: "chain2-pipe",
@@ -74,7 +74,7 @@ const CASES: Case[] = [
   {
     name: "obj-direct",
     headline: false,
-    run: () => toEntries()({ ...OBJ }),
+    run: () => toEntries({ ...OBJ }),
   },
   {
     name: "obj-pipe",
@@ -92,7 +92,7 @@ const CASES: Case[] = [
   {
     name: "big-direct",
     headline: true,
-    run: () => double()(BIG_ARR.slice()),
+    run: () => double(BIG_ARR.slice()),
   },
   {
     name: "big-pipe",

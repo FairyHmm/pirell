@@ -2,7 +2,7 @@
 // onto Bound<Out> (unfit siblings uncallable, not vanished); failure arm
 // sits outside the arrow so the call itself is uncallable (TS2349).
 
-import type { Bound, Op, Shape } from "./base.js";
+import type { Bound, Op, OpLike, Shape } from "./base.js";
 import type { MatchShape } from "./match-shape.js";
 import type { Assembled, CurrentShp, OpMap } from "./assembled.js";
 
@@ -14,11 +14,19 @@ export type ShapeMismatch<In extends Shape, Actual extends Shape> = {
   actual: Actual;
 };
 
-export type Fluent<F extends Op<any, any, any>, S, Ops extends OpMap = {}> =
-  F extends Op<infer In extends Shape, infer Out extends Shape, any>
-    ? MatchShape<In, CurrentShp<S>> extends true
-      ? () => Assembled<Bound<Out>> & {
-          [P in keyof Ops]: Fluent<Ops[P], Bound<Out>, Ops>;
+export type Fluent<F extends OpLike, S, Ops extends OpMap = {}> =
+  // Factory arm first: a factory's Op return can't extend Raw (data is
+  // never function-typed), so a plain op always falls through cleanly.
+  F extends (...args: infer A) => Op<infer FIn extends Shape, infer FOut extends Shape>
+    ? MatchShape<FIn, CurrentShp<S>> extends true
+      ? (...args: A) => Assembled<Bound<FOut>> & {
+          [P in keyof Ops]: Fluent<Ops[P], Bound<FOut>, Ops>;
         }
-      : ShapeMismatch<In, CurrentShp<S>>
-    : never;
+      : ShapeMismatch<FIn, CurrentShp<S>>
+    : F extends Op<infer In extends Shape, infer Out extends Shape>
+      ? MatchShape<In, CurrentShp<S>> extends true
+        ? () => Assembled<Bound<Out>> & {
+            [P in keyof Ops]: Fluent<Ops[P], Bound<Out>, Ops>;
+          }
+        : ShapeMismatch<In, CurrentShp<S>>
+      : never;

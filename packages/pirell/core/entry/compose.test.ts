@@ -109,9 +109,9 @@ describe("standalone pipe/compose with pirell Ops", () => {
     // flattenEntries' Out is ["i"] (no element-type claim); double now
     // claims [["i", number]] — bridging that seam is an explicit cast,
     // not an inferred continuation (see fixture-ops.ts).
-    const entries = toEntries()({ a: 1, b: 2 }) as Raw<["i", "i..."]>;
-    const flat = flattenEntries()(entries) as unknown as Raw<[["i", number]]>;
-    const result = double()(flat);
+    const entries = toEntries({ a: 1, b: 2 });
+    const flat = flattenEntries(entries) as unknown as Raw<[["i", number]]>;
+    const result = double(flat);
     expect(result).toEqual([2, 4]);
   });
 });

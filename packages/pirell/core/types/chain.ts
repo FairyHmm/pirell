@@ -16,27 +16,34 @@ type IsTuple<Fns extends readonly unknown[]> = number extends Fns["length"]
 // Both ends read off one ComposeChain walk (first In feeds input,
 // last Out feeds result). extends-Shape guards keep the degenerate
 // empty chain from leaking unknown through a vacuous-never match.
+// Single-link chains get their own arm: [F, ...M, L] needs two fixed
+// positions, so a 1-tuple never matches it (pre-existing gap — single
+// pipes used to resolve never).
+type ChainResult<F> =
+  IsThunk<F> extends true
+    ? F extends Op<any, infer LOut extends Shape>
+      ? Raw<LOut>
+      : F extends () => (data: any) => infer R
+        ? R
+        : never
+    : F extends (arg: any) => infer R
+      ? R
+      : never;
+
+type ChainEntry<F> = F extends Op<infer FIn extends Shape, any> ? FIn : ["..."];
+
 type ChainEnds<Fns extends readonly unknown[]> =
-  ComposeChain<Fns> extends [infer First, ...infer _M, infer Last]
-    ? [
-        First extends Op<infer FIn extends Shape, any, []> ? FIn : ["..."],
-        IsThunk<Last> extends true
-          ? Last extends Op<any, infer LOut extends Shape, any>
-            ? Raw<LOut>
-            : Last extends () => (data: any) => infer R
-              ? R
-              : never
-          : Last extends (arg: any) => infer R
-            ? R
-            : never,
-      ]
-    : never;
+  ComposeChain<Fns> extends [infer Only]
+    ? [ChainEntry<Only>, ChainResult<Only>]
+    : ComposeChain<Fns> extends [infer First, ...infer _M, infer Last]
+      ? [ChainEntry<First>, ChainResult<Last>]
+      : never;
 
 // First link's In (superseded by FirstData below, kept for compatibility).
 // ["..."] wherever the chain gives up (non-Op / parameterized / empty).
 export type FirstIn<Fns extends readonly unknown[]> =
   ComposeChain<Fns> extends [infer First, ...unknown[]]
-    ? First extends Op<infer FIn extends Shape, any, []>
+    ? First extends Op<infer FIn extends Shape, any>
       ? FIn
       : ["..."]
     : ["..."];
@@ -46,11 +53,15 @@ export type FirstIn<Fns extends readonly unknown[]> =
 // stay identical.
 export type FirstData<Fns extends readonly unknown[]> =
   Fns extends [infer F, ...unknown[]]
-    ? F extends Op<infer FIn extends Shape, any, []>
+    ? IsThunk<F> extends true
       ? F extends (...args: any[]) => (data: infer D0) => any
         ? D0
         : unknown
-      : unknown
+      : F extends Op<infer FIn extends Shape, any>
+        ? F extends (data: infer D0) => any
+          ? D0
+          : unknown
+        : unknown
     : IsTuple<Fns> extends true
       ? never
       : unknown;
@@ -61,19 +72,13 @@ export type FirstData<Fns extends readonly unknown[]> =
 // rebuilding DataOf/Raw per link — same check, no reconstruction.
 type Step<F, Cur> =
   IsThunk<F> extends true
-    ? F extends Op<any, any, infer FArgs>
-      ? FArgs extends []
-        ? F extends (...args: any[]) => (data: infer D0) => infer R0
-          ? Cur extends D0
-            ? { ok: true; r: R0; l: F }
-            : { ok: false }
-          : { ok: false }
+    ? F extends (...args: any[]) => (data: infer D0) => infer R0
+      ? Cur extends D0
+        ? { ok: true; r: R0; l: F }
         : { ok: false }
-      : F extends () => (data: any) => infer R
-        ? { ok: true; r: R; l: F }
-        : { ok: false }
+      : { ok: false }
     : F extends (arg: Cur) => infer R
-      ? { ok: true; r: R; l: (arg: Cur) => R }
+      ? { ok: true; r: R; l: F }
       : { ok: false };
 
 // Concretely typed links for assemble.ts's .pipe()/.compose(). Threads
@@ -103,21 +108,13 @@ export type ComposeChain<Fns extends readonly unknown[]> =
   IsTuple<Fns> extends true
     ? Fns extends [infer F, ...infer Rest]
       ? IsThunk<F> extends true
-        ? F extends Op<any, any, infer FArgs>
-          ? FArgs extends []
-            ? F extends (...args: any[]) => (data: any) => infer R
-              ? [F, ...Tail<Rest, R>]
-              : never
-            : never
-          : F extends () => (data: infer A) => infer R
-            ? Rest extends []
-              ? [() => (data: A) => R]
-              : [() => (data: A) => R, ...Tail<Rest, R>]
-            : never
+        ? F extends (...args: any[]) => (data: any) => infer R
+          ? [F, ...Tail<Rest, R>]
+          : never
         : F extends (arg: infer A) => infer R
           ? Rest extends []
-            ? [(arg: A) => R]
-            : [(arg: A) => R, ...Tail<Rest, R>]
+            ? [F]
+            : [F, ...Tail<Rest, R>]
           : never
       : never
     : Fns extends Array<infer F>

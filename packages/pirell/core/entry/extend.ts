@@ -4,25 +4,28 @@ import { valueOf } from "./surface.js";
 
 export function extend<Ops extends OpMap>(surface: any, ops: Ops): any;
 export function extend<Ops extends OpMap>(ops: Ops): (surface: any) => any;
-// Args constrained to []: this form zero-calls fn to reach its stage —
-// a parameterized op would silently run with its argument missing, so
-// reject it at the type level instead.
-export function extend(fn: Op<any, any, []>): (x: any) => any;
+// Data op only: a factory applied here would take the data as its key
+// argument and hand back a function, so reject function-typed results
+// at the type level (and re-check at runtime for untyped callers).
+export function extend<F extends (data: any) => unknown>(
+  fn: F & (ReturnType<F> extends (...args: any[]) => any ? never : unknown),
+): (x: any) => any;
 export function extend(surfaceOrOps: any, ops?: any): any {
   if (ops !== undefined) {
     return applyExtend(surfaceOrOps, ops);
   }
   if (typeof surfaceOrOps === "function") {
     // Unwrap surfaces to raw value first (both typeof checks matter:
-    // surfaces are callable fns); zero-call fn to reach its stage.
-    if (surfaceOrOps.length !== 0) {
-      throw new TypeError(
-        `extend(fn): fn expects ${surfaceOrOps.length} argument(s) — parameterized ops aren't supported by this form (their argument would be silently missing). Wire it via extend(surface, { name: fn }) instead, or pre-apply the argument: extend(fn(arg)).`,
-      );
-    }
+    // surfaces are callable fns); then run the op on the raw data.
     return (surfaceOrValue: any) => {
       const raw = valueOf(surfaceOrValue);
-      return surfaceOrOps()(raw);
+      const out = surfaceOrOps(raw);
+      if (typeof out === "function") {
+        throw new TypeError(
+          "extend(fn): fn returned a function — parameterized ops aren't supported by this form (the data was taken as the op's argument). Wire it via extend(surface, { name: fn }) instead, or pre-apply the argument: extend(fn(arg)).",
+        );
+      }
+      return out;
     };
   }
   return (surface: any) => applyExtend(surface, surfaceOrOps);

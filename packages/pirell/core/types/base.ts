@@ -57,13 +57,16 @@ export type Raw<S extends Shape> = [unknown] extends [DataOf<S>]
   : DataOf<S> & { readonly [__shapeBrand]?: S };
 
 // Data param carries its own In claim under ordinary TS checking —
-// plain JS function + annotation, no factory. (Detours that cost more:
-// checked() wrapper, generic-<D> Op, intersecting param.)
-export type Op<
-  In extends Shape,
-  Out extends Shape,
-  Args extends unknown[] = [],
-> = (...args: Args) => (data: DataOf<In>) => Raw<Out>;
+// a single-stage (data) => result function. Parameterized ops are
+// factories returning Op (args live in a plain signature, not the
+// type); the surface applies args, then checks data once.
+export type Op<In extends Shape, Out extends Shape> = (
+  data: DataOf<In>,
+) => Raw<Out>;
+
+// Anything registrable via .extend(): a data op, or a factory that
+// yields one once applied. Runtime applies args-then-data uniformly.
+export type OpLike = Op<any, any> | ((...args: any[]) => Op<any, any>);
 
 // Type-level tag for a data-bound surface. Forward-declared here to avoid
 // a circular dependency; named Bound (not Wrapper) so it doesn't collide

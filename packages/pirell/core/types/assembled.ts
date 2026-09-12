@@ -2,12 +2,20 @@
 // runtime lives in entry/assemble.ts, Fluent in types/fluent.ts
 // (separate file avoids depending on its own dependent).
 
-import type { Bound, Deferred, Op, Raw, Shape } from "./base.js";
+import type { Bound, Deferred, Op, OpLike, Raw, Shape } from "./base.js";
 import type { Tail } from "./chain.js";
 import type { IsUnion } from "./codec.js";
 import type { Fluent } from "./fluent.js";
 
-export type OpMap = Record<string, Op<any, any, any>>;
+export type OpMap = Record<string, OpLike>;
+
+// An op's Out, whether registered whole or as a factory (both forms
+// declare it on the Op return).
+type OpOut<F> = F extends Op<any, infer Out extends Shape>
+  ? Out
+  : F extends (...args: any[]) => Op<any, infer Out extends Shape>
+    ? Out
+    : never;
 
 // Unwraps a surface's bound value (paired with CurrentShp below —
 // the two must stay in lockstep). Deferred checked FIRST: it
@@ -80,8 +88,10 @@ export type Assembled<S> = S & {
     ? IsUnion<keyof Ops> extends true
       ? ReOpped<S, Ops> & { [P in keyof Ops]: Fluent<Ops[P], S, Ops> }
       : keyof Ops extends infer K extends keyof Ops
-        ? Ops[K] extends Op<any, infer Out extends Shape, any>
-          ? Reassembled<S, Out, Ops> & { [P in keyof Ops]: Fluent<Ops[P], S, Ops> }
+        ? Ops[K] extends OpLike
+          ? OpOut<Ops[K]> extends infer Out extends Shape
+            ? Reassembled<S, Out, Ops> & { [P in keyof Ops]: Fluent<Ops[P], S, Ops> }
+            : never
           : never
         : never
     : Assembled<S> & { [P in keyof Ops]: Fluent<Ops[P], S, Ops> };
