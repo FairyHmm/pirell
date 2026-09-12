@@ -1,9 +1,8 @@
 import type {
   ComposeChain,
   ComposeResult,
-  FirstIn,
+  FirstData,
 } from "../types/chain.js";
-import type { DataOf } from "../types/codec.js";
 import { makeFlat } from "../ops/ops.js";
 
 // Untyped runtime shared by typed compose below and the surface builders.
@@ -38,7 +37,7 @@ export function composeRaw(...fns: Array<(x: any) => any>): (x: any) => any {
 // first link's entry claim.
 export function compose<Fns extends unknown[]>(
   ...fns: Fns & ComposeChain<Fns>
-): (data: DataOf<FirstIn<Fns>>) => ComposeResult<Fns>;
+): (data: FirstData<Fns>) => ComposeResult<Fns>;
 export function compose(...fns: Array<(x: any) => any>): (x: any) => any {
   return composeRaw(...fns);
 }
@@ -46,7 +45,7 @@ export function compose(...fns: Array<(x: any) => any>): (x: any) => any {
 // Data-first view of compose. The entry claim is authored here, not in
 // shape-agnostic makeFlat — same Chain/Result types, flipped argument order.
 type PipeFn = <Fns extends unknown[]>(
-  data: DataOf<FirstIn<Fns>>,
+  data: FirstData<Fns>,
   ...fns: Fns & ComposeChain<Fns>
 ) => ComposeResult<Fns>;
 

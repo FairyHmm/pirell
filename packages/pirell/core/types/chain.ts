@@ -17,26 +17,23 @@ type IsTuple<Fns extends readonly unknown[]> = number extends Fns["length"]
 // last Out feeds result). extends-Shape guards keep the degenerate
 // empty chain from leaking unknown through a vacuous-never match.
 type ChainEnds<Fns extends readonly unknown[]> =
-  ComposeChain<Fns> extends [infer First, ...unknown[]]
-    ? ComposeChain<Fns> extends [...unknown[], infer Last]
-      ? [
-          First extends Op<infer FIn extends Shape, any, []> ? FIn : ["..."],
-          IsThunk<Last> extends true
-            ? Last extends Op<any, infer LOut extends Shape, any>
-              ? Raw<LOut>
-              : Last extends () => (data: any) => infer R
-                ? R
-                : never
-            : Last extends (arg: any) => infer R
+  ComposeChain<Fns> extends [infer First, ...infer _M, infer Last]
+    ? [
+        First extends Op<infer FIn extends Shape, any, []> ? FIn : ["..."],
+        IsThunk<Last> extends true
+          ? Last extends Op<any, infer LOut extends Shape, any>
+            ? Raw<LOut>
+            : Last extends () => (data: any) => infer R
               ? R
-              : never,
-        ]
-      : never
+              : never
+          : Last extends (arg: any) => infer R
+            ? R
+            : never,
+      ]
     : never;
 
-// First link's In, shared by compose's return and pipe's signature so the
-// two can't drift. ["..."] wherever the chain gives up (non-Op /
-// parameterized / empty: graceful degradation, not rejection).
+// First link's In (superseded by FirstData below, kept for compatibility).
+// ["..."] wherever the chain gives up (non-Op / parameterized / empty).
 export type FirstIn<Fns extends readonly unknown[]> =
   ComposeChain<Fns> extends [infer First, ...unknown[]]
     ? First extends Op<infer FIn extends Shape, any, []>
@@ -44,15 +41,32 @@ export type FirstIn<Fns extends readonly unknown[]> =
       : ["..."]
     : ["..."];
 
+// Concrete entry-data type from the first link's own annotation (no
+// DataOf re-derivation). Routing mirrors FirstIn exactly, so give-ups
+// stay identical.
+export type FirstData<Fns extends readonly unknown[]> =
+  Fns extends [infer F, ...unknown[]]
+    ? F extends Op<infer FIn extends Shape, any, []>
+      ? F extends (...args: any[]) => (data: infer D0) => any
+        ? D0
+        : unknown
+      : unknown
+    : IsTuple<Fns> extends true
+      ? never
+      : unknown;
+
 // Mismatch is a shape ({ok: false}), not a bare never a tuple pattern
-// would match vacuously. Thunk links check the threaded raw value against
-// DataOf directly — threaded, never derived (no ShapeOf call anywhere).
+// would match vacuously. Declared ops check against their own annotation's
+// param/return (already elaborated, cached) instead of decomposing Op and
+// rebuilding DataOf/Raw per link — same check, no reconstruction.
 type Step<F, Cur> =
   IsThunk<F> extends true
-    ? F extends Op<infer FIn, infer FOut, infer FArgs>
+    ? F extends Op<any, any, infer FArgs>
       ? FArgs extends []
-        ? Cur extends DataOf<FIn>
-          ? { ok: true; r: Raw<FOut>; l: Op<FIn, FOut, []> }
+        ? F extends (...args: any[]) => (data: infer D0) => infer R0
+          ? Cur extends D0
+            ? { ok: true; r: R0; l: F }
+            : { ok: false }
           : { ok: false }
         : { ok: false }
       : F extends () => (data: any) => infer R
@@ -83,14 +97,17 @@ export type Tail<Fns extends readonly unknown[], Cur> =
       : never;
 
 // First link keeps its double-curried Op type (passed un-invoked); later
-// links are threaded — different positions, not duplication.
+// links are threaded — different positions, not duplication. Links keep
+// their own declared types (no Op/Raw reconstruction — see Step).
 export type ComposeChain<Fns extends readonly unknown[]> =
   IsTuple<Fns> extends true
     ? Fns extends [infer F, ...infer Rest]
       ? IsThunk<F> extends true
-        ? F extends Op<infer FIn, infer FOut, infer FArgs>
+        ? F extends Op<any, any, infer FArgs>
           ? FArgs extends []
-            ? [Op<FIn, FOut, []>, ...Tail<Rest, Raw<FOut>>]
+            ? F extends (...args: any[]) => (data: any) => infer R
+              ? [F, ...Tail<Rest, R>]
+              : never
             : never
           : F extends () => (data: infer A) => infer R
             ? Rest extends []
