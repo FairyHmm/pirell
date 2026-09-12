@@ -25,7 +25,7 @@ importers:
         version: 8.2.2(@types/node@26.4.1)(esbuild@0.28.2)(terser@5.50.0)(tsx@4.23.13)
       webpack:
         specifier: ^5.109.2
-        version: 5.109.2(esbuild@0.28.2)(webpack-cli@7.2.2)
+        version: 5.109.2(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.26)(webpack-cli@7.2.2)
       webpack-cli:
         specifier: ^7.2.2
         version: 7.2.2(webpack@5.109.2)
@@ -54,6 +54,9 @@ importers:
         specifier: workspace:*
         version: link:../core
     devDependencies:
+      '@pirell/relational':
+        specifier: workspace:*
+        version: link:../relational
       tsdown:
         specifier: ^0.22.14
         version: 0.22.14(tsx@4.23.13)(typescript@7.0.2)
@@ -2402,15 +2405,17 @@ snapshots:
 
   mime-db@1.54.0: {}
 
-  minimizer-webpack-plugin@5.6.1(esbuild@0.28.2)(webpack@5.109.2):
+  minimizer-webpack-plugin@5.6.1(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.26)(webpack@5.109.2):
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
       jest-worker: 27.5.1
       schema-utils: 4.3.3
       terser: 5.50.0
-      webpack: 5.109.2(esbuild@0.28.2)(webpack-cli@7.2.2)
+      webpack: 5.109.2(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.26)(webpack-cli@7.2.2)
     optionalDependencies:
       esbuild: 0.28.2
+      lightningcss: 1.33.0
+      postcss: 8.5.26
 
   nanoid@3.3.18: {}
 
@@ -2726,7 +2731,7 @@ snapshots:
       import-local: 3.2.0
       interpret: 3.1.1
       rechoir: 0.8.0
-      webpack: 5.109.2(esbuild@0.28.2)(webpack-cli@7.2.2)
+      webpack: 5.109.2(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.26)(webpack-cli@7.2.2)
       webpack-merge: 6.0.1
 
   webpack-merge@6.0.1:
@@ -2737,7 +2742,7 @@ snapshots:
 
   webpack-sources@3.5.1: {}
 
-  webpack@5.109.2(esbuild@0.28.2)(webpack-cli@7.2.2):
+  webpack@5.109.2(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.26)(webpack-cli@7.2.2):
     dependencies:
       '@types/estree': 1.0.9
       '@types/json-schema': 7.0.15
@@ -2753,7 +2758,7 @@ snapshots:
       events: 3.3.0
       graceful-fs: 4.2.11
       mime-db: 1.54.0
-      minimizer-webpack-plugin: 5.6.1(esbuild@0.28.2)(webpack@5.109.2)
+      minimizer-webpack-plugin: 5.6.1(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.26)(webpack@5.109.2)
       neo-async: 2.6.2
       schema-utils: 4.3.3
       tapable: 2.3.3
