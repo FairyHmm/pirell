@@ -4,22 +4,14 @@
 
 import type { Bound, Deferred, Op, OpLike, Raw, Shape } from "./base.js";
 import type { Tail } from "./chain.js";
-import type { IsUnion } from "./codec.js";
-import type { Fluent } from "./fluent.js";
+import type { IsUnion, ShapeOf } from "./codec.js";
+import type { OpMethods } from "./fluent.js";
 
 export type OpMap = Record<string, OpLike>;
 
-// An op's Out, whether registered whole or as a factory (both forms
-// declare it on the Op return).
-type OpOut<F> = F extends Op<any, infer Out extends Shape>
-  ? Out
-  : F extends (...args: any[]) => Op<any, infer Out extends Shape>
-    ? Out
-    : never;
-
-// Unwraps a surface's bound value (paired with CurrentShp below —
-// the two must stay in lockstep). Deferred checked FIRST: it
-// structurally satisfies Bound too, so Bound-first would misroute it.
+// Unwraps a surface's bound value (paired with CurrentShp below — the
+// two must stay in lockstep). Deferred checked FIRST: it structurally
+// satisfies Bound too, so Bound-first would misroute it.
 export type CurrentData<S> =
   S extends Deferred<infer Out extends Shape>
     ? Raw<Out>
@@ -28,7 +20,6 @@ export type CurrentData<S> =
       : never;
 
 // The surface's current proven Shape, read fresh at each Fluent call.
-// Deferred checked first — see CurrentData above.
 export type CurrentShp<S> =
   S extends Deferred<infer Out extends Shape>
     ? Out
@@ -36,68 +27,82 @@ export type CurrentShp<S> =
       ? Shp
       : ["..."];
 
-// Rich Ops-aware Deferred: Omit strips the bare call signature first,
-// or TS resolves calls against it and silently drops Ops.
-type OpsDeferred<Shp extends Shape, Ops extends OpMap> = Omit<
-  Deferred<Shp>,
-  "value"
-> & {
-  (data: unknown): Assembled<Bound<Shp>> & {
-    [P in keyof Ops]: Fluent<Ops[P], Bound<Shp>, Ops>;
-  };
-  readonly value: undefined;
-};
-
-// Retypes the surface after narrowing .extend(). Threads Ops through
-// the Deferred arm so the call signature keeps the just-extended ops
-// (without this, invoking the surface drops them).
-type Reassembled<S, Shp extends Shape, Ops extends OpMap> =
-  S extends Deferred<any>
-    ? Assembled<OpsDeferred<Shp, Ops>>
-    : S extends Bound<any>
-      ? Assembled<Bound<Shp>>
-      : never;
-
-// Multi-key .extend() keeps S (no narrowing), but the Deferred call
-// signature still needs the new Ops swapped in. Bound needs nothing:
-// it carries Ops via the surrounding Fluent intersection already.
-type ReOpped<S, Ops extends OpMap> =
-  S extends Deferred<infer Out extends Shape>
-    ? Assembled<OpsDeferred<Out, Ops>>
-    : Assembled<S>;
+// Collapses Shp/Ops before the nested <T> call signature sees them:
+// threading extend<Ops>'s still-open params straight through two generic
+// layers cost 380K insts + TS7056 (probe, HANDOFF) — ~54K once resolved
+// here. Omit drops the bare Deferred call signature, which would
+// otherwise silently swallow the Ops re-wire.
+type ResolvedOpsDeferred<
+  Shp extends Shape,
+  Ops extends OpMap,
+> = Shp extends infer S extends Shape
+  ? Ops extends infer O extends OpMap
+    ? Omit<Deferred<S>, "value"> & {
+        <T>(
+          data: T,
+        ): Assembled<Bound<ShapeOf<T>>> & OpMethods<O, Bound<ShapeOf<T>>>;
+        readonly value: undefined;
+      }
+    : never
+  : never;
 
 type ChainFns<S> = [(arg: CurrentData<S>) => any, ...Array<(arg: any) => any>];
 
-// Deferred-only compose member, split out so Assembled stays flat.
-type Composable<S> =
-  S extends Deferred<any>
-    ? {
-        compose<Fns extends ChainFns<S>>(
-          ...fns: Fns & Tail<Fns, CurrentData<S>>
-        ): Assembled<S>;
-      }
-    : unknown;
+// Deferred-only compose member. An interface so .d.ts emit references it
+// by name instead of re-inlining Tail's machinery at every Deferred use.
+export interface IComposable<S> {
+  compose<Fns extends ChainFns<S>>(
+    ...fns: Fns & Tail<Fns, CurrentData<S>>
+  ): Assembled<S>;
+}
 
-// .extend() always accepts; checking fires on Fluent's return at the
-// call, not at registration. Bound keeps data-proven S (the call
-// narrows anyway); Deferred keeps narrowing (its only shape source).
-export type Assembled<S> = S & {
+// A surface's methods, as an interface so .d.ts emit keeps it by name
+// instead of re-expanding extend/pipe's conditionals at every surface
+// (type aliases inline in emit; interfaces are referenced by name).
+// The data type itself (S) stays an intersection underneath.
+export interface ISurface<S> {
+  // A single op narrows S to its Out; union ops are un-narrowable, so
+  // the Deferred surface is kept with only Ops re-wired (fresh register
+  // call then stays deferred rather than dropping the ops).
   extend<Ops extends OpMap>(
     ops: Ops,
   ): S extends Deferred<any>
     ? IsUnion<keyof Ops> extends true
-      ? ReOpped<S, Ops> & { [P in keyof Ops]: Fluent<Ops[P], S, Ops> }
+      ? Assembled<
+          S extends Deferred<infer Out extends Shape>
+            ? ResolvedOpsDeferred<Out, Ops>
+            : S
+        > &
+          OpMethods<Ops, S>
       : keyof Ops extends infer K extends keyof Ops
-        ? Ops[K] extends OpLike
-          ? OpOut<Ops[K]> extends infer Out extends Shape
-            ? Reassembled<S, Out, Ops> & { [P in keyof Ops]: Fluent<Ops[P], S, Ops> }
-            : never
+        ? Ops[K] extends
+            | Op<any, infer Out extends Shape>
+            | ((...args: any[]) => Op<any, infer Out extends Shape>)
+          ? Assembled<
+              S extends Deferred<any>
+                ? ResolvedOpsDeferred<Out, Ops>
+                : S extends Bound<any>
+                  ? Bound<Out>
+                  : never
+            > &
+              OpMethods<Ops, S>
           : never
         : never
-    : Assembled<S> & { [P in keyof Ops]: Fluent<Ops[P], S, Ops> };
-  // Deferred checked first — see CurrentData's comment above; otherwise
-  // a Deferred's .pipe() wrongly collapsed to unknown (Bound's arm).
+    : Assembled<S> & OpMethods<Ops, S>;
+  // Deferred checked first — otherwise a Deferred's .pipe() would
+  // collapse to unknown (Bound's arm).
   pipe<Fns extends ChainFns<S>>(
     ...fns: Fns & Tail<Fns, CurrentData<S>>
-  ): S extends Deferred<any> ? Assembled<S> : S extends Bound<any> ? unknown : Assembled<S>;
-} & Composable<S>;
+  ): S extends Deferred<any>
+    ? Assembled<S>
+    : S extends Bound<any>
+      ? unknown
+      : Assembled<S>;
+}
+
+// .extend() always accepts; shape checking fires on Fluent's return
+// (its mismatch arm is uncallable), not at registration. Deferred-only
+// compose rides in via the IComposable conditional.
+export type Assembled<S> = ISurface<S> &
+  S &
+  (S extends Deferred<any> ? IComposable<S> : unknown);

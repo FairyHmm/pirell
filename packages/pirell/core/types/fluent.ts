@@ -17,16 +17,21 @@ export type ShapeMismatch<In extends Shape, Actual extends Shape> = {
 export type Fluent<F extends OpLike, S, Ops extends OpMap = {}> =
   // Factory arm first: a factory's Op return can't extend Raw (data is
   // never function-typed), so a plain op always falls through cleanly.
-  F extends (...args: infer A) => Op<infer FIn extends Shape, infer FOut extends Shape>
+  F extends (
+    ...args: infer A
+  ) => Op<infer FIn extends Shape, infer FOut extends Shape>
     ? MatchShape<FIn, CurrentShp<S>> extends true
-      ? (...args: A) => Assembled<Bound<FOut>> & {
-          [P in keyof Ops]: Fluent<Ops[P], Bound<FOut>, Ops>;
-        }
+      ? (...args: A) => Assembled<Bound<FOut>> & OpMethods<Ops, Bound<FOut>>
       : ShapeMismatch<FIn, CurrentShp<S>>
     : F extends Op<infer In extends Shape, infer Out extends Shape>
       ? MatchShape<In, CurrentShp<S>> extends true
-        ? () => Assembled<Bound<Out>> & {
-            [P in keyof Ops]: Fluent<Ops[P], Bound<Out>, Ops>;
-          }
+        ? () => Assembled<Bound<Out>> & OpMethods<Ops, Bound<Out>>
         : ShapeMismatch<In, CurrentShp<S>>
       : never;
+
+// One shared definition instead of six inline copies at the surface
+// return sites — each copy was an independently solved instantiation.
+// Interfaces can't extend a mapped type (TS2312), so this stays an alias.
+export type OpMethods<Ops extends OpMap, S> = {
+  [P in keyof Ops]: Fluent<Ops[P], S, Ops>;
+};

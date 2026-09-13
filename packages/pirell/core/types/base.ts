@@ -46,20 +46,16 @@ export type ElemCase<E extends Elem> = E extends Dim
 // Shape↔type mapping lives in codec.ts (DataOf/ShapeOf are inverses —
 // same ladder, opposite directions). Raw/Op below build on DataOf.
 
-// Optional brand lets a prior op's output satisfy the next op's input
-// with zero cast. The unknown-guard keeps unshaped claims as plain
-// unknown instead of an unsatisfiable object type.
-declare const __shapeBrand: unique symbol;
-// Exported for codec.ts's brand-presence gate.
-export type ShapeBrand = typeof __shapeBrand;
+// Unbranded: the old unique-symbol brand was never structurally tested
+// by any consumer, and a private symbol can't be named by packages
+// re-exporting it (TS4023 → TS7056). Unknown-guard kept — it collapses
+// unshaped claims to plain unknown instead of an unsatisfiable type.
 export type Raw<S extends Shape> = [unknown] extends [DataOf<S>]
   ? unknown
-  : DataOf<S> & { readonly [__shapeBrand]?: S };
+  : DataOf<S>;
 
-// Data param carries its own In claim under ordinary TS checking —
-// a single-stage (data) => result function. Parameterized ops are
-// factories returning Op (args live in a plain signature, not the
-// type); the surface applies args, then checks data once.
+// Data carries its own In (a single-stage fn); parameterized ops are
+// factories returning Op — the surface applies args, then checks once.
 export type Op<In extends Shape, Out extends Shape> = (
   data: DataOf<In>,
 ) => Raw<Out>;
