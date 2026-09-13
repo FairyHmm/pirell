@@ -7,6 +7,7 @@ import {
   entriesToObject,
   sumValues,
   flattenEntries,
+  take,
 } from "../ops/fixture-ops.js";
 
 describe("Wrapper.extend (data-bound)", () => {
@@ -138,6 +139,29 @@ describe("Wrapper.extend with multiple ops registered together", () => {
       ["a", 1],
       ["b", 2],
     ]);
+  });
+});
+
+// builders.ts runOp resolves a zero-arg fluent call by result: data ops
+// return it directly; factories fed the data yield the data stage (a
+// function), so they're re-called plain to apply to the data instead.
+describe("Wrapper.extend zero-arg resolution", () => {
+  it("applies an optional-arg factory as op()(data)", () => {
+    const result = pirell([1, 2, 3]).extend({ take }).take();
+
+    expect(result.value).toEqual([1, 2, 3]);
+  });
+
+  it("applies the same factory with its argument as op(arg)(data)", () => {
+    const result = pirell([1, 2, 3]).extend({ take }).take(2);
+
+    expect(result.value).toEqual([1, 2]);
+  });
+
+  it("data ops still take the direct zero-arg path", () => {
+    const result = pirell([1, 2, 3]).extend({ sumAll }).sumAll();
+
+    expect(result.value).toBe(6);
   });
 });
 

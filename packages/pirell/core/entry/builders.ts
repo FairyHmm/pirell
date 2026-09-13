@@ -7,13 +7,22 @@ import type { Assembled, OpMap } from "./assemble.js";
 // surface types). One shared assembly sequence; the two surface kinds
 // differ only in what each step means (eager vs lazy).
 
-// Ops are data fns; factories are applied to args first. The call's own
-// args decide (a factory must be applied to yield its data stage, a
-// plain op already is that stage).
-const runOp = (op: OpLike, args: any[], data: unknown): unknown =>
-  args.length === 0
-    ? (op as (data: unknown) => unknown)(data)
-    : (op as (...a: any[]) => (data: unknown) => unknown)(...args)(data);
+// Ops are data fns; factories are applied to args first. A zero-arg call
+// is ambiguous — data op or all-optional-arg factory. The result
+// resolves it: factories, fed the data, produce the data-stage function.
+const runOp = (op: OpLike, args: any[], data: unknown): unknown => {
+  if (args.length === 0) {
+    const direct = (op as (data: unknown) => unknown)(data);
+    if (typeof direct === "function") {
+      const stage = (op as (...a: any[]) => (d: unknown) => unknown)();
+      if (typeof stage === "function") {
+        return stage(data);
+      }
+    }
+    return direct;
+  }
+  return (op as (...a: any[]) => (data: unknown) => unknown)(...args)(data);
+};
 
 type SurfaceSpec = {
   invoke: (input: unknown) => unknown;

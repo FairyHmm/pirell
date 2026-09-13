@@ -40,4 +40,15 @@ export const mixedLength: Op<["i..."], []> = (data) => data.length;
 
 // Parameterized op: a factory — the argument lives in a plain signature,
 // exercising a parameterized op as a chain link once applied.
-export const nth = (i: number): Op<["i"], []> => (data) => data[i];
+export const nth =
+  (i: number): Op<["i"], []> =>
+  (data) =>
+    data[i];
+
+// Optional-arg factory: its no-arg fluent form must resolve as op()(data)
+// — builders.ts runOp detects factories-by-result, so `(n?)` needs no
+// marker here.
+export const take =
+  (n?: number): Op<["i"], ["i"]> =>
+  (data) =>
+    data.slice(0, n);
