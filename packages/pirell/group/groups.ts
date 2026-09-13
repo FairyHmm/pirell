@@ -36,3 +36,5 @@ export const indexBy =
     }
     return out;
   };
+
+export const groupingMethods = { groupBy, indexBy };
