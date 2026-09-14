@@ -62,11 +62,14 @@ export type Op<In extends Shape, Out extends Shape> = (
 
 // Anything registrable via .extend(): a data op, or a factory that
 // yields one once applied. Runtime applies args-then-data uniformly.
-// The data-op arm takes `data: any` — Op<any, any>'s param resolves to
-// DataOf<any> = unknown, which would reject any aliased concrete op
-// (TS only fast-path-compares direct Op instantiations). Fluent still
-// gates real per-call shapes, so 'any' here is a container check only.
-export type OpLike = ((data: any) => any) | ((...args: any[]) => Op<any, any>);
+// Both arms return `(data: any) => any` — Op<any, any>'s param resolves
+// to DataOf<any> = unknown, which would reject any aliased concrete op
+// (TS only fast-path-compares direct Op instantiations), and the raw
+// factory output is exactly what runOp applies. Fluent still gates real
+// per-call shapes, so 'any' here is a container check only.
+export type OpLike =
+  | ((data: any) => any)
+  | ((...args: any[]) => (data: any) => any);
 
 // Type-level tag for a data-bound surface. Forward-declared here to avoid
 // a circular dependency; named Bound (not Wrapper) so it doesn't collide
