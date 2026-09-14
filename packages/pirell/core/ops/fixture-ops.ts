@@ -52,3 +52,8 @@ export const take =
   (n?: number): Op<["i"], ["i"]> =>
   (data) =>
     data.slice(0, n);
+
+// Open-shape op for transition chains (closed `double` can't accept
+// the unknown[] flowing out of flattenEntries).
+export const doubleOpen: Op<["i", "..."], ["i", "..."]> = (ns) =>
+  (ns as number[]).map((n) => n * 2);

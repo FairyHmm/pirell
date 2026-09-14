@@ -1,12 +1,11 @@
 import { composeRaw } from "./compose.js";
 import { SURFACE, isSurface, valueOf } from "./surface.js";
-import { each } from "./each.js";
 import type { Bound, Deferred, OpLike } from "../types/base.js";
-import type { Assembled, OpMap } from "./assemble.js";
+import type { Assembled, OpMap } from "../types/assembled.js";
 
-// Runtime surface builders (companion to assemble.ts, which owns the
-// surface types). One shared assembly sequence; the two surface kinds
-// differ only in what each step means (eager vs lazy).
+// Runtime surface builders (surface types live in types/assembled.ts).
+// One shared assembly sequence; the two surface kinds differ only in
+// what each step means (eager vs lazy).
 
 // Ops are data fns; factories are applied to args first. A zero-arg call
 // is ambiguous — data op or all-optional-arg factory. The result
@@ -25,21 +24,28 @@ const runOp = (op: OpLike, args: any[], data: unknown): unknown => {
   return (op as (...a: any[]) => (data: unknown) => unknown)(...args)(data);
 };
 
+type Method = (spec: SurfaceSpec, args: unknown[]) => unknown;
+
 type SurfaceSpec = {
   invoke: (input: unknown) => unknown;
   getValue: () => unknown;
-  applyOp: (op: OpLike, args: any[]) => unknown;
-  spawn: (ops: OpMap) => unknown;
-  onPipe: (fns: Array<(x: any) => any>) => unknown;
-  composable: boolean;
+  applyOp: (op: OpLike, args: unknown[]) => unknown;
+  spawn: (added: OpMap) => unknown;
 };
 
+// --- one universal loop ---
+
 // One property map + single defineProperties: markers non-enumerable,
-// methods enumerable+writable. Op methods forward args untouched —
-// checking lives in Op signatures and chain typing, not here.
+// methods enumerable+writable. Only `extend` is hardcoded — its table
+// must exist before the first op registration.
 function buildSurface(ops: OpMap, spec: SurfaceSpec): any {
   const target: any = spec.invoke;
-  const onPipe = (...fns: Array<(x: any) => any>) => spec.onPipe(fns);
+  const methods: Record<string, Method> = {};
+  methods.extend = (spec, [added]) => spec.spawn(added as OpMap);
+  for (const name of Object.keys(ops)) {
+    const op = ops[name]!;
+    methods[name] = (spec, args) => spec.applyOp(op, args);
+  }
   const assigned = {
     enumerable: true,
     writable: true,
@@ -48,39 +54,23 @@ function buildSurface(ops: OpMap, spec: SurfaceSpec): any {
   const props: PropertyDescriptorMap = {
     [SURFACE]: { value: true },
     value: { get: spec.getValue },
-    extend: {
-      ...assigned,
-      value: (added: OpMap) => spec.spawn({ ...ops, ...added }),
-    },
-    pipe: { ...assigned, value: onPipe },
-    each: {
-      ...assigned,
-      value: (...args: any[]) => spec.applyOp(each, args),
-    },
   };
-  for (const name of Object.keys(ops)) {
-    const opFn = ops[name]!;
+  for (const [name, method] of Object.entries(methods)) {
     props[name] = {
       ...assigned,
-      value: (...args: any[]) => spec.applyOp(opFn, args),
+      value: (...args: unknown[]) => method(spec, args),
     };
   }
-  // compose() only where composition can stay lazy; a bound surface has
-  // nothing deferred to compose into (see Assembled<S> in assemble.ts).
-  if (spec.composable) props.compose = { ...assigned, value: onPipe };
   Object.defineProperties(target, props);
   return target;
 }
 
 export function buildBound(value: unknown, ops: OpMap): Assembled<Bound<any>> {
   return buildSurface(ops, {
-    // Re-enter: reuse another surface's value, or bind raw data as-is.
     invoke: (input) => buildBound(valueOf(input), ops),
     getValue: () => value,
     applyOp: (op, args) => buildBound(runOp(op, args, value), ops),
-    spawn: (nextOps) => buildBound(value, nextOps),
-    onPipe: (fns) => composeRaw(...fns)(value),
-    composable: false,
+    spawn: (added) => buildBound(value, { ...ops, ...added }),
   });
 }
 
@@ -88,10 +78,6 @@ export function buildDeferred(
   steps: Array<(data: unknown) => unknown>,
   ops: OpMap,
 ): Assembled<Deferred<any>> {
-  // pipe and compose are the same append: staying lazy already is
-  // compose's "don't apply yet" contract.
-  const append = (fns: Array<(x: any) => any>) =>
-    buildDeferred([...steps, composeRaw(...fns)], ops);
   return buildSurface(ops, {
     invoke: (input) =>
       buildBound(
@@ -103,8 +89,6 @@ export function buildDeferred(
     getValue: () => undefined,
     applyOp: (op, args) =>
       buildDeferred([...steps, (data) => runOp(op, args, data)], ops),
-    spawn: (nextOps) => buildDeferred(steps, nextOps),
-    onPipe: append,
-    composable: true,
+    spawn: (added) => buildDeferred(steps, { ...ops, ...added }),
   });
 }

@@ -4,7 +4,7 @@
 import { basename } from "node:path";
 import { assertTsc, cleanup, compile, tmpFile } from "./tsc.js";
 
-const MISMATCH = `import { pirell } from "../entry/assemble.js";
+const MISMATCH = `import { pirell } from "../index.js";
 import { toEntries } from "../ops/fixture-ops.js";
 const bad = pirell([1, 2, 3]).extend({ toEntries }).toEntries();
 export { bad };

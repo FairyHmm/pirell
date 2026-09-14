@@ -1,5 +1,5 @@
 import type { Op } from "../types/base.js";
-import type { OpMap } from "./assemble.js";
+import type { ExtendResult, OpMap } from "../types/assembled.js";
 import { valueOf } from "./surface.js";
 
 /**
@@ -14,18 +14,29 @@ import { valueOf } from "./surface.js";
  * $([1, 2]).double().value; // [2, 4]
  * ```
  *
+ * The surface param is typed `surface: S` (the bare surface, not
+ * `Assembled<S>`) so inference runs on plain positions, not
+ * `ISurface`'s conditional returns. The result is
+ * {@linkcode ExtendResult} — the same type `surface.extend(ops)`
+ * itself returns.
+ *
  * Published compositions annotate the result `Extended<typeof ops>`
  * (see `Extended`); shape checking fires at each op call, not at
  * registration.
  */
-export function extend<Ops extends OpMap>(surface: any, ops: Ops): any;
-export function extend<Ops extends OpMap>(ops: Ops): (surface: any) => any;
+export function extend<S, Ops extends OpMap>(
+  surface: S,
+  ops: Ops,
+): ExtendResult<S, Ops>;
+export function extend<Ops extends OpMap>(
+  ops: Ops,
+): <S>(surface: S) => ExtendResult<S, Ops>;
 // Data op only: a factory applied here would take the data as its key
 // argument and hand back a function, so reject function-typed results
 // at the type level (and re-check at runtime for untyped callers).
 export function extend<F extends (data: any) => unknown>(
   fn: F & (ReturnType<F> extends (...args: any[]) => any ? never : unknown),
-): (x: any) => any;
+): (x: any) => ReturnType<F>;
 export function extend(surfaceOrOps: any, ops?: any): any {
   if (ops !== undefined) {
     return applyExtend(surfaceOrOps, ops);

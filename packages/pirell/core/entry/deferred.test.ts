@@ -1,5 +1,5 @@
 import { describe, it, expect, expectTypeOf } from "vitest";
-import { pirell } from "./assemble.js";
+import { pirell } from "../index.js";
 import {
   double,
   sumAll,

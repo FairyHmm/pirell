@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { pirell } from "./assemble.js";
+import { pirell } from "../index.js";
 import { extend } from "./extend.js";
 import { pipe } from "./compose.js";
 import { double, nth } from "../ops/fixture-ops.js";

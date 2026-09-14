@@ -1,9 +1,8 @@
 // Assembled<S>: the decorated pirell() surface type. Pure types —
-// runtime lives in entry/assemble.ts, Fluent in types/fluent.ts
-// (separate file avoids depending on its own dependent).
+// runtime lives in entry/builders.ts, Fluent in types/fluent.ts.
 
 import type { Bound, Deferred, Op, OpLike, Raw, Shape } from "./base.js";
-import type { Tail } from "./chain.js";
+import type { ComposeResult, Tail } from "./chain.js";
 import type { IsUnion, ShapeOf } from "./codec.js";
 import type { OpMethods } from "./fluent.js";
 
@@ -34,8 +33,9 @@ export type CurrentShp<S> =
  * Collapses Shp/Ops before the nested call signature sees them:
  * threading still-open params through two generic layers cost 380K
  * insts + TS7056 (~54K once resolved here). `Omit` drops the bare
- * `Deferred` call signature, which would otherwise silently swallow
- * the ops re-wire.
+ * `Deferred` call signature, replacing it with one built from the
+ * same formula as `BoundWith` — one definition of "bind T, wire Ops",
+ * used at both the free-function overload and here.
  */
 export type ResolvedOpsDeferred<
   Shp extends Shape,
@@ -43,9 +43,7 @@ export type ResolvedOpsDeferred<
 > = Shp extends infer S extends Shape
   ? Ops extends infer O extends OpMap
     ? Omit<Deferred<S>, "value"> & {
-        <T>(
-          data: T,
-        ): Assembled<Bound<ShapeOf<T>>> & OpMethods<O, Bound<ShapeOf<T>>>;
+        <T>(data: T): BoundWith<O, ShapeOf<T>>;
         readonly value: undefined;
       }
     : never
@@ -54,23 +52,14 @@ export type ResolvedOpsDeferred<
 type ChainFns<S> = [(arg: CurrentData<S>) => any, ...Array<(arg: any) => any>];
 
 /**
- * Deferred-only `compose`. An interface so `.d.ts` emit references it
- * by name instead of re-inlining `Tail`'s machinery at every use.
- */
-export interface IComposable<S> {
-  compose<Fns extends ChainFns<S>>(
-    ...fns: Fns & Tail<Fns, CurrentData<S>>
-  ): Assembled<S>;
-}
-
-/**
  * What `surface.extend(ops)` returns, named once so publishers (and
  * our own packages) can annotate composed surfaces for JSR's
  * explicit-type rule instead of re-spelling the conditional.
  * `ISurface.extend` is defined as this alias — single source of
- * truth, no drift.
+ * truth, no drift. Exported so `entry/extend.ts` can type its
+ * surface-argument overload against the exact same formula.
  */
-type ExtendResult<S, Ops extends OpMap> =
+export type ExtendResult<S, Ops extends OpMap> =
   S extends Deferred<any>
     ? IsUnion<keyof Ops> extends true
       ? Assembled<
@@ -137,24 +126,31 @@ export interface ISurface<S> {
   extend<Ops extends OpMap>(ops: Ops): ExtendResult<S, Ops>;
   /**
    * Threads the bound value through functions, or appends them lazily
-   * on a deferred surface. Deferred checked first — otherwise a
-   * deferred `.pipe()` would collapse to unknown (Bound's arm).
+   * on a deferred surface. Both surface kinds return a surface —
+   * bound applies immediately, deferred appends.
    */
   pipe<Fns extends ChainFns<S>>(
     ...fns: Fns & Tail<Fns, CurrentData<S>>
   ): S extends Deferred<any>
     ? Assembled<S>
     : S extends Bound<any>
-      ? unknown
+      ? Assembled<Bound<ShapeOf<ComposeResult<Fns>>>>
+      : Assembled<S>;
+  /**
+   * Lazy composition — same behavior as `.pipe()` on the surface.
+   */
+  compose<Fns extends ChainFns<S>>(
+    ...fns: Fns & Tail<Fns, CurrentData<S>>
+  ): S extends Deferred<any>
+    ? Assembled<S>
+    : S extends Bound<any>
+      ? Assembled<Bound<ShapeOf<ComposeResult<Fns>>>>
       : Assembled<S>;
 }
 
 /**
- * The decorated `pirell()` surface: methods plus data, plus
- * deferred-only `compose`. `.extend()` always accepts; shape checking
- * fires on `Fluent`'s return (its mismatch arm is uncallable), not at
- * registration.
+ * The decorated `pirell()` surface: methods plus data. `.extend()`
+ * always accepts; shape checking fires on `Fluent`'s return (its
+ * mismatch arm is uncallable), not at registration.
  */
-export type Assembled<S> = ISurface<S> &
-  S &
-  (S extends Deferred<any> ? IComposable<S> : unknown);
+export type Assembled<S> = ISurface<S> & S;

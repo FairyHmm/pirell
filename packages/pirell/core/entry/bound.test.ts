@@ -1,5 +1,5 @@
 import { describe, it, expect, expectTypeOf } from "vitest";
-import { pirell } from "./assemble.js";
+import { pirell } from "../index.js";
 import {
   double,
   sumAll,
@@ -8,6 +8,7 @@ import {
   sumValues,
   flattenEntries,
   take,
+  doubleOpen,
 } from "../ops/fixture-ops.js";
 
 describe("Wrapper.extend (data-bound)", () => {
@@ -166,33 +167,33 @@ describe("Wrapper.extend zero-arg resolution", () => {
 });
 
 describe("Wrapper.pipe (data-bound)", () => {
-  it("applies plain functions immediately and returns the raw result", () => {
-    const result = (pirell([1, 2, 3]) as any).pipe(double, sumAll);
+  it("applies functions and returns a surface", () => {
+    const result = pirell([1, 2, 3]).pipe(double, sumAll).value;
     expect(result).toBe(12); // (1+2+3)*2
   });
 
   it("pipes through shape transitions", () => {
-    const result = (pirell({ a: 1, b: 2 }) as any).pipe(
+    const result = pirell({ a: 1, b: 2 }).pipe(
       toEntries,
       flattenEntries,
-      double,
-    );
+      doubleOpen,
+    ).value;
     expect(result).toEqual([2, 4]);
   });
 });
 
-// Bound has no .compose(): it already holds data, so there's no deferred
-// state to compose into — see assemble.ts's Assembled<S> comment.
-describe("Wrapper.compose (data-bound): intentionally absent", () => {
-  it("is not present on a Bound surface", () => {
-    const wrapper = pirell([1, 2, 3]) as any;
-    expect(wrapper.compose).toBeUndefined();
+describe("Wrapper.compose (data-bound)", () => {
+  it("applies functions and returns a surface", () => {
+    const result = pirell([1, 2, 3]).compose(double, sumAll).value;
+    expect(result).toBe(12);
   });
 
-  it("rejects at the type level too", () => {
-    if (false) {
-      // @ts-expect-error -- compose() only exists on Deferred, not Bound
-      pirell([1, 2, 3]).compose(double, sumAll);
-    }
+  it("pipes through shape transitions", () => {
+    const result = pirell({ a: 1, b: 2 }).compose(
+      toEntries,
+      flattenEntries,
+      doubleOpen,
+    ).value;
+    expect(result).toEqual([2, 4]);
   });
 });

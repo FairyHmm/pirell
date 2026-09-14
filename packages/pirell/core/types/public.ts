@@ -7,9 +7,9 @@ export type { ShapeOf } from "./codec.js";
 export type { OpMethods } from "./fluent.js";
 export type {
   ISurface,
-  IComposable,
   Assembled,
   ResolvedOpsDeferred,
   Extended,
   BoundWith,
+  OpMap,
 } from "./assembled.js";

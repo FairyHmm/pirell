@@ -1,9 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, expectTypeOf } from "vitest";
 // Import ONLY from the public entry — the point is that a user can
 // recreate the library (define their own composable ops and assemble a
 // surface) using nothing but the exported API.
-import type { Op } from "../index.js";
-import { extend, pirell } from "../index.js";
+import type { Op, BoundWith, Extended, OpMap, ShapeOf } from "../index.js";
+import { extend, pirell, buildBound, buildDeferred, pipe, compose, each } from "../index.js";
 
 // Bodies are factories returning data fns; the as-cast supplies the
 // Op<...> shapes on the product.
@@ -69,5 +69,38 @@ describe("recreating the library through the public API", () => {
       a: [{ status: "a" }, { status: "a" }],
       b: [{ status: "b" }],
     });
+  });
+});
+
+describe("recreating pirell() itself from buildBound/buildDeferred", () => {
+  const myOps = { pipe: compose, compose, each };
+
+  function myPirell<T>(data: T): BoundWith<typeof myOps, ShapeOf<T>>;
+  function myPirell(): Extended<typeof myOps>;
+  function myPirell(...args: [unknown] | []): unknown {
+    return args.length === 0
+      ? buildDeferred([], myOps)
+      : buildBound(args[0], myOps);
+  }
+
+  it("binds data and threads it through pipe, same as pirell()", () => {
+    const result = myPirell([1, 2, 3]).pipe((ns: number[]) =>
+      ns.map((n) => n * 2),
+    );
+    expect(result.value).toEqual([2, 4, 6]);
+    expectTypeOf(result.value).not.toBeAny();
+  });
+
+  it("a custom ops map is wired the same way core's is", () => {
+    const withSum = { ...myOps, sum };
+    function myPirellPlus<T>(data: T): BoundWith<typeof withSum, ShapeOf<T>>;
+    function myPirellPlus(): Extended<typeof withSum>;
+    function myPirellPlus(...args: [unknown] | []): unknown {
+      return args.length === 0
+        ? buildDeferred([], withSum)
+        : buildBound(args[0], withSum);
+    }
+    const total = myPirellPlus([{ amount: 1 }, { amount: 2 }]).sum("amount");
+    expect(total.value).toBe(3);
   });
 });

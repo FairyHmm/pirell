@@ -2,7 +2,7 @@
 // feel). Min-across-runs primary (pauses only ever add).
 
 import { pipe } from "../entry/compose.js";
-import { pirell } from "../entry/assemble.js";
+import { pirell } from "../index.js";
 import { double, sumAll, toEntries } from "../ops/fixture-ops.js";
 import { parseFlags } from "./args.js";
 import { fmt, renderTable } from "./report.js";

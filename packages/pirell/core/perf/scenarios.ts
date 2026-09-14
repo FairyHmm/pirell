@@ -4,7 +4,7 @@
 
 export const HEAD = [
   'import { pipe, compose } from "../entry/compose.js";',
-  'import { pirell } from "../entry/assemble.js";',
+  'import { pirell } from "../index.js";',
   'import { double, sumAll, toEntries, entriesToObject, flattenEntries, sumValues, stringifyValues, mixedLength, nth } from "../ops/fixture-ops.js";',
 ].join("\n");
 

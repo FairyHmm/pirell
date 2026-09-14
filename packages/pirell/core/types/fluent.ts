@@ -85,10 +85,8 @@ export type Fluent<F extends OpLike, S, Ops extends OpMap = {}> =
 // Interfaces can't extend a mapped type (TS2312), so this stays an alias.
 /**
  * A surface's ops as callable methods, each wired by {@linkcode Fluent}.
- * `each` is baked in as a universal member — it's a core method, not a
- * package op — so every surface advertises it and re-wires it through
- * chains, gated to keyed `S` by `Fluent` just like any other op (a
- * non-keyed surface reads it as the uncallable {@linkcode ShapeMismatch}).
+ * `each` is universal — always present, no opt-in — gated to keyed `S`
+ * by `Fluent` just like any other op.
  */
 export type OpMethods<Ops extends OpMap, S> = {
   [P in keyof Ops]: Fluent<Ops[P], S, Ops>;

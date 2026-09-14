@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { pirell } from "./assemble.js";
+import { pirell } from "../index.js";
 import {
   toEntries,
   flattenEntries,
@@ -24,11 +24,11 @@ describe("Keyed<unknown, 'mixed'> (non-uniform keyed nodes)", () => {
   });
 
   it("chains mixed-keyed -> toEntries -> flattenEntries in a pipe", () => {
-    const result = (pirell({ id: 42, label: "foo" }) as any).pipe(
+    const result = pirell({ id: 42, label: "foo" }).pipe(
       stringifyValues,
       toEntries,
       flattenEntries,
-    );
+    ).value;
 
     expect(result).toEqual(["42", "foo"]);
   });
