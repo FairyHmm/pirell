@@ -1,14 +1,29 @@
 import type { Op } from "@pirell/core";
 import type { Row, Table } from "@pirell/relational";
 
-// groupBy partitions a Table into a Group of Tables, keyed by a field
-// name or a key function. Rows missing the key land under "undefined".
-
-// The key names a field, or projects one from the caller's own row
-// type — Pirell only ever speaks shapes; row value types are the
-// caller's business (simple data in, complex TS types discouraged).
+/**
+ * Names the group key: a field name, or a projection over the
+ * caller's own row type. Pirell only ever speaks shapes; row value
+ * types are the caller's business.
+ */
 export type GroupKey<R> = string | ((row: R) => string);
 
+/**
+ * Partitions a table into a record of tables, keyed by a field name
+ * or key function. Rows missing the key land under `"undefined"`.
+ *
+ * ```ts
+ * import { pirell } from "@pirell/group";
+ *
+ * pirell([
+ *   { status: "paid", amount: 5 },
+ *   { status: "unpaid", amount: 2 },
+ * ]).groupBy("status").value;
+ * // { paid: [{ status: "paid", amount: 5 }], unpaid: [...] }
+ * ```
+ *
+ * @param key A field name, or a function projecting one from each row.
+ */
 export const groupBy =
   <R>(key: GroupKey<R>): Op<Table, ["k", ...Table]> =>
   (data) =>
@@ -23,10 +38,25 @@ export const groupBy =
       String(typeof key === "function" ? key(row as R) : row[key]),
     ) as Record<string, Record<string, unknown>[]>;
 
+/**
+ * Indexes a table into a record of single rows, keyed by a field
+ * name or key function. Last row wins on key collision.
+ *
+ * ```ts
+ * import { pirell } from "@pirell/group";
+ *
+ * pirell([
+ *   { id: "a", amount: 5 },
+ *   { id: "b", amount: 2 },
+ * ]).indexBy("id").value;
+ * // { a: { id: "a", amount: 5 }, b: { id: "b", amount: 2 } }
+ * ```
+ *
+ * @param key A field name, or a function projecting one from each row.
+ */
 export const indexBy =
   <R>(key: GroupKey<R>): Op<Table, ["k", ...Row]> =>
   (data) => {
-    // Last Row wins; terminal — no row-collection dimension retained.
     const out = Object.create(null) as Record<string, Record<string, unknown>>;
     for (const row of data) {
       const k = typeof key === "function" ? key(row as R) : row[key];
@@ -35,4 +65,5 @@ export const indexBy =
     return out;
   };
 
+/**Grouping ops, as data for `extend`. */
 export const groupingMethods = { groupBy, indexBy };
