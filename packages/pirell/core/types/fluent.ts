@@ -5,6 +5,7 @@
 import type { Bound, Op, OpLike, Shape } from "./base.js";
 import type { MatchShape } from "./match-shape.js";
 import type { Assembled, CurrentShp, OpMap } from "./assembled.js";
+import type { each } from "../entry/each.js";
 
 /**
  * Names a shape mismatch in error output instead of an opaque `never`.
@@ -60,8 +61,10 @@ export type Fluent<F extends OpLike, S, Ops extends OpMap = {}> =
         ? [ClaimOf<D>] extends [never]
           ? ShapeMismatch<never, CurrentShp<S>>
           : MatchShape<ClaimOf<D>, CurrentShp<S>> extends true
-            ? (...args: A) =>
-                Assembled<Bound<OutOf<RD>>> & OpMethods<Ops, Bound<OutOf<RD>>>
+            ? (
+                ...args: A
+              ) => Assembled<Bound<OutOf<RD>>> &
+                OpMethods<Ops, Bound<OutOf<RD>>>
             : ShapeMismatch<ClaimOf<D>, CurrentShp<S>>
         : F extends Op<infer In extends Shape, infer Out extends Shape>
           ? MatchShape<In, CurrentShp<S>> extends true
@@ -71,8 +74,8 @@ export type Fluent<F extends OpLike, S, Ops extends OpMap = {}> =
             ? [ClaimOf<D2>] extends [never]
               ? ShapeMismatch<never, CurrentShp<S>>
               : MatchShape<ClaimOf<D2>, CurrentShp<S>> extends true
-                ? () =>
-                    Assembled<Bound<OutOf<unknown>>> & OpMethods<Ops, Bound<OutOf<unknown>>>
+                ? () => Assembled<Bound<OutOf<unknown>>> &
+                    OpMethods<Ops, Bound<OutOf<unknown>>>
                 : ShapeMismatch<ClaimOf<D2>, CurrentShp<S>>
             : never
     : never;
@@ -82,7 +85,13 @@ export type Fluent<F extends OpLike, S, Ops extends OpMap = {}> =
 // Interfaces can't extend a mapped type (TS2312), so this stays an alias.
 /**
  * A surface's ops as callable methods, each wired by {@linkcode Fluent}.
+ * `each` is baked in as a universal member — it's a core method, not a
+ * package op — so every surface advertises it and re-wires it through
+ * chains, gated to keyed `S` by `Fluent` just like any other op (a
+ * non-keyed surface reads it as the uncallable {@linkcode ShapeMismatch}).
  */
 export type OpMethods<Ops extends OpMap, S> = {
   [P in keyof Ops]: Fluent<Ops[P], S, Ops>;
+} & {
+  each: Fluent<typeof each, S, Ops>;
 };

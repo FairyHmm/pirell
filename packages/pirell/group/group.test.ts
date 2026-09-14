@@ -134,3 +134,21 @@ describe("grouping shape rejection", () => {
     }
   });
 });
+
+describe("each", () => {
+  it("re-wires onto a groupMethod result", () => {
+    const result = pirell(orders)
+      .groupBy("status")
+      .each((rows: unknown[]) =>
+        [...(rows as { amount: number }[])].sort((a, b) => a.amount - b.amount),
+      )
+      .values().value;
+    expect(result).toEqual([
+      [
+        { status: "paid", amount: 5 },
+        { status: "paid", amount: 7 },
+      ],
+      [{ status: "unpaid", amount: 2 }],
+    ]);
+  });
+});

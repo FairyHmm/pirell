@@ -1,5 +1,6 @@
 import { composeRaw } from "./compose.js";
 import { SURFACE, isSurface, valueOf } from "./surface.js";
+import { each } from "./each.js";
 import type { Bound, Deferred, OpLike } from "../types/base.js";
 import type { Assembled, OpMap } from "./assemble.js";
 
@@ -52,6 +53,10 @@ function buildSurface(ops: OpMap, spec: SurfaceSpec): any {
       value: (added: OpMap) => spec.spawn({ ...ops, ...added }),
     },
     pipe: { ...assigned, value: onPipe },
+    each: {
+      ...assigned,
+      value: (...args: any[]) => spec.applyOp(each, args),
+    },
   };
   for (const name of Object.keys(ops)) {
     const opFn = ops[name]!;

@@ -22,3 +22,4 @@ export { pirell } from "./entry/assemble.js";
 export { extend } from "./entry/extend.js";
 export { makeFlat, makeCurry } from "./ops/ops.js";
 export { SURFACE, isSurface, valueOf } from "./entry/surface.js";
+export { each } from "./entry/each.js";
