@@ -13,79 +13,107 @@ export type Rewrap = Op<Indexed, Indexed>;
 export type Terminal = Op<Indexed, []>;
 export type ArrayCallback = (row: any, index: number) => any;
 
-// Each op just forwards data to a native method; the wrappers supply the
-// Rewrap/Terminal conversion once.
-const rewrap =
-  (apply: (data: any[]) => any): Rewrap =>
+// Each op forwards data straight to a native method; the : Rewrap /
+// : Terminal annotation supplies the conversion (and the JSR-required
+// explicit return type) — data arrives as unknown[] via Op's DataOf.
+export const map =
+  (fn: ArrayCallback): Rewrap =>
   (data) =>
-    apply(data);
-const terminal =
-  (apply: (data: any[]) => any): Terminal =>
+    data.map(fn);
+
+export const filter =
+  (pred: ArrayCallback): Rewrap =>
   (data) =>
-    apply(data);
+    data.filter(pred);
 
-export const map = (fn: ArrayCallback) => rewrap((data) => data.map(fn));
+export const sort =
+  (compare?: (a: any, b: any) => number): Rewrap =>
+  (data) =>
+    data.toSorted(compare);
 
-export const filter = (pred: ArrayCallback) =>
-  rewrap((data) => data.filter(pred));
+export const slice =
+  (start?: number, end?: number): Rewrap =>
+  (data) =>
+    data.slice(start, end);
 
-export const sort = (compare?: (a: any, b: any) => number) =>
-  rewrap((data) => data.toSorted(compare));
+export const flat =
+  (depth?: number): Rewrap =>
+  (data) =>
+    data.flat(depth);
 
-export const slice = (start?: number, end?: number) =>
-  rewrap((data) => data.slice(start, end));
+export const flatMap =
+  (fn: ArrayCallback): Rewrap =>
+  (data) =>
+    data.flatMap(fn);
 
-export const flat = (depth?: number) => rewrap((data) => data.flat(depth));
-
-export const flatMap = (fn: ArrayCallback) =>
-  rewrap((data) => data.flatMap(fn));
-
-export const concat = (...items: any[]) =>
-  rewrap((data) => data.concat(...items));
+export const concat =
+  (...items: any[]): Rewrap =>
+  (data) =>
+    data.concat(...items);
 
 // Named for the operation, not the native call — matches `sort`, which
 // also calls a `toX`-copy method (`toSorted`) under a plain-verb name.
-export const reverse = () => rewrap((data) => data.toReversed());
+export const reverse = (): Rewrap => (data) => data.toReversed();
 
 // `with` is a reserved word, so the export is `with_`; the methods map
 // renames the fluent method to `with`.
-export const with_ = (index: number, value: any) =>
-  rewrap((data) => data.with(index, value));
+export const with_ =
+  (index: number, value: any): Rewrap =>
+  (data) =>
+    data.with(index, value);
 
 // Copy-safe splice — mutating `splice` itself is deliberately excluded.
-export const toSpliced = (
-  start: number,
-  deleteCount?: number,
-  ...items: any[]
-) => rewrap((data) => data.toSpliced(start, deleteCount as number, ...items));
+export const toSpliced =
+  (start: number, deleteCount?: number, ...items: any[]): Rewrap =>
+  (data) =>
+    data.toSpliced(start, deleteCount as number, ...items);
 
-export const find = (pred: ArrayCallback) =>
-  terminal((data) => data.find(pred));
+export const find =
+  (pred: ArrayCallback): Terminal =>
+  (data) =>
+    data.find(pred);
 
-export const findIndex = (pred: ArrayCallback) =>
-  terminal((data) => data.findIndex(pred));
+export const findIndex =
+  (pred: ArrayCallback): Terminal =>
+  (data) =>
+    data.findIndex(pred);
 
-export const findLast = (pred: ArrayCallback) =>
-  terminal((data) => data.findLast(pred));
+export const findLast =
+  (pred: ArrayCallback): Terminal =>
+  (data) =>
+    data.findLast(pred);
 
-export const findLastIndex = (pred: ArrayCallback) =>
-  terminal((data) => data.findLastIndex(pred));
+export const findLastIndex =
+  (pred: ArrayCallback): Terminal =>
+  (data) =>
+    data.findLastIndex(pred);
 
-export const at = (index: number) => terminal((data) => data.at(index));
+export const at =
+  (index: number): Terminal =>
+  (data) =>
+    data.at(index);
 
 // Renamed from native `join` — `@pirell/relational` owns `join` for
 // relational table joins; this avoids the future name collision.
-export const arrayJoin = (separator?: string) =>
-  terminal((data) => data.join(separator));
+export const arrayJoin =
+  (separator?: string): Terminal =>
+  (data) =>
+    data.join(separator);
 
-export const some = (pred: ArrayCallback) =>
-  terminal((data) => data.some(pred));
+export const some =
+  (pred: ArrayCallback): Terminal =>
+  (data) =>
+    data.some(pred);
 
-export const every = (pred: ArrayCallback) =>
-  terminal((data) => data.every(pred));
+export const every =
+  (pred: ArrayCallback): Terminal =>
+  (data) =>
+    data.every(pred);
 
-export const indexOf = (value: any, fromIndex?: number) =>
-  terminal((data) => data.indexOf(value, fromIndex));
+export const indexOf =
+  (value: any, fromIndex?: number): Terminal =>
+  (data) =>
+    data.indexOf(value, fromIndex);
 
 export const lastIndexOf =
   (value: any, ...rest: [fromIndex?: number]): Terminal =>
@@ -97,10 +125,12 @@ export const lastIndexOf =
       : data.lastIndexOf(value, rest[0]);
   };
 
-export const includes = (value: any, fromIndex?: number) =>
-  terminal((data) => data.includes(value, fromIndex));
+export const includes =
+  (value: any, fromIndex?: number): Terminal =>
+  (data) =>
+    data.includes(value, fromIndex);
 
-export const length = terminal((data) => data.length);
+export const length: Terminal = (data) => data.length;
 
 export const reduce =
   (
