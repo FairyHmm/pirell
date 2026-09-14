@@ -16,9 +16,25 @@ export const values: Op<Keyed, Indexed> = Object.values;
 export const entries: Op<Keyed, Pairs> = Object.entries;
 export const fromEntries: Op<Pairs, ["k"]> = Object.fromEntries;
 
+// assign is a factory (needs the merge sources up front), unlike the
+// four direct assignments above — right-side sources win on key
+// collision, matching native Object.assign semantics.
+export const assign =
+  (...sources: Record<string, unknown>[]): Op<Keyed, Keyed> =>
+  (data) =>
+    Object.assign({}, data, ...sources);
+
+// Terminal probe — scalar result on keyed data (no rewrap counterpart).
+export const hasOwn =
+  (key: string): Op<Keyed, []> =>
+  (data) =>
+    Object.hasOwn(data, key);
+
 export const objectFallthroughMethods = {
   keys,
   values,
   entries,
   fromEntries,
+  assign,
+  hasOwn,
 };

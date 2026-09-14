@@ -40,11 +40,43 @@ export const flat = (depth?: number) => rewrap((data) => data.flat(depth));
 export const flatMap = (fn: ArrayCallback) =>
   rewrap((data) => data.flatMap(fn));
 
+export const concat = (...items: any[]) =>
+  rewrap((data) => data.concat(...items));
+
+// Named for the operation, not the native call — matches `sort`, which
+// also calls a `toX`-copy method (`toSorted`) under a plain-verb name.
+export const reverse = () => rewrap((data) => data.toReversed());
+
+// `with` is a reserved word, so the export is `with_`; the methods map
+// renames the fluent method to `with`.
+export const with_ = (index: number, value: any) =>
+  rewrap((data) => data.with(index, value));
+
+// Copy-safe splice — mutating `splice` itself is deliberately excluded.
+export const toSpliced = (
+  start: number,
+  deleteCount?: number,
+  ...items: any[]
+) => rewrap((data) => data.toSpliced(start, deleteCount as number, ...items));
+
 export const find = (pred: ArrayCallback) =>
   terminal((data) => data.find(pred));
 
 export const findIndex = (pred: ArrayCallback) =>
   terminal((data) => data.findIndex(pred));
+
+export const findLast = (pred: ArrayCallback) =>
+  terminal((data) => data.findLast(pred));
+
+export const findLastIndex = (pred: ArrayCallback) =>
+  terminal((data) => data.findLastIndex(pred));
+
+export const at = (index: number) => terminal((data) => data.at(index));
+
+// Renamed from native `join` — `@pirell/relational` owns `join` for
+// relational table joins; this avoids the future name collision.
+export const arrayJoin = (separator?: string) =>
+  terminal((data) => data.join(separator));
 
 export const some = (pred: ArrayCallback) =>
   terminal((data) => data.some(pred));
@@ -54,6 +86,16 @@ export const every = (pred: ArrayCallback) =>
 
 export const indexOf = (value: any, fromIndex?: number) =>
   terminal((data) => data.indexOf(value, fromIndex));
+
+export const lastIndexOf =
+  (value: any, ...rest: [fromIndex?: number]): Terminal =>
+  (data) => {
+    // Explicit-undefined fromIndex coerces to 0 in native lastIndexOf —
+    // keep the omitted form forwarding no second argument (as reduce).
+    return rest.length === 0
+      ? data.lastIndexOf(value)
+      : data.lastIndexOf(value, rest[0]);
+  };
 
 export const includes = (value: any, fromIndex?: number) =>
   terminal((data) => data.includes(value, fromIndex));
@@ -73,20 +115,62 @@ export const reduce =
       : data.reduce(reducer, rest[0]);
   };
 
-export const arrayFallthroughMethods = {
+export const reduceRight =
+  (
+    reducer: (acc: any, value: any, index: number) => any,
+    ...rest: [initial?: any]
+  ): Terminal =>
+  (data) => {
+    return rest.length === 0
+      ? data.reduceRight(reducer)
+      : data.reduceRight(reducer, rest[0]);
+  };
+
+// Method sets grouped by intent; the flat aggregate keeps group/index.ts
+// wiring unchanged. Export order is the public-surface order.
+export const arrayTransformMethods = {
   map,
   filter,
   sort,
   slice,
   flat,
   flatMap,
+  concat,
+  reverse,
+  with: with_,
+  toSpliced,
+};
 
+export const arrayLookupMethods = {
   find,
   findIndex,
+  findLast,
+  findLastIndex,
+  at,
+};
+
+export const arrayTestMethods = {
   some,
   every,
   indexOf,
+  lastIndexOf,
   includes,
+};
+
+export const arrayFoldMethods = {
   reduce,
+  reduceRight,
+};
+
+export const arrayMeasureMethods = {
   length,
+  arrayJoin,
+};
+
+export const arrayFallthroughMethods = {
+  ...arrayTransformMethods,
+  ...arrayLookupMethods,
+  ...arrayTestMethods,
+  ...arrayFoldMethods,
+  ...arrayMeasureMethods,
 };
