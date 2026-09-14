@@ -32,7 +32,7 @@ export type CurrentShp<S> =
 // layers cost 380K insts + TS7056 (probe, HANDOFF) — ~54K once resolved
 // here. Omit drops the bare Deferred call signature, which would
 // otherwise silently swallow the Ops re-wire.
-type ResolvedOpsDeferred<
+export type ResolvedOpsDeferred<
   Shp extends Shape,
   Ops extends OpMap,
 > = Shp extends infer S extends Shape
@@ -56,17 +56,12 @@ export interface IComposable<S> {
   ): Assembled<S>;
 }
 
-// A surface's methods, as an interface so .d.ts emit keeps it by name
-// instead of re-expanding extend/pipe's conditionals at every surface
-// (type aliases inline in emit; interfaces are referenced by name).
-// The data type itself (S) stays an intersection underneath.
-export interface ISurface<S> {
-  // A single op narrows S to its Out; union ops are un-narrowable, so
-  // the Deferred surface is kept with only Ops re-wired (fresh register
-  // call then stays deferred rather than dropping the ops).
-  extend<Ops extends OpMap>(
-    ops: Ops,
-  ): S extends Deferred<any>
+// What surface.extend(ops) returns, named once so publishers (and our
+// own packages) can annotate composed surfaces for JSR's explicit-type
+// rule instead of re-spelling the conditional. ISurface.extend below is
+// defined as this alias — single source of truth, no drift.
+type ExtendResult<S, Ops extends OpMap> =
+  S extends Deferred<any>
     ? IsUnion<keyof Ops> extends true
       ? Assembled<
           S extends Deferred<infer Out extends Shape>
@@ -89,6 +84,28 @@ export interface ISurface<S> {
           : never
         : never
     : Assembled<S> & OpMethods<Ops, S>;
+
+// The common composition: pirell().extend(ops) — deferred surface, ops
+// re-wired. Annotate published compositions as Extended<typeof ops>.
+export type Extended<Ops extends OpMap> = ExtendResult<Deferred<[]>, Ops>;
+
+// A chained data-bound surface: pirell(data).op(...).op(...) — data of
+// shape Out with the same ops still callable. Annotate published chains
+// as BoundWith<typeof ops, Out>.
+export type BoundWith<Ops extends OpMap, Out extends Shape> = Assembled<
+  Bound<Out>
+> &
+  OpMethods<Ops, Bound<Out>>;
+
+// A surface's methods, as an interface so .d.ts emit keeps it by name
+// instead of re-expanding extend/pipe's conditionals at every surface
+// (type aliases inline in emit; interfaces are referenced by name).
+// The data type itself (S) stays an intersection underneath.
+export interface ISurface<S> {
+  // A single op narrows S to its Out; union ops are un-narrowable, so
+  // the Deferred surface is kept with only Ops re-wired (fresh register
+  // call then stays deferred rather than dropping the ops).
+  extend<Ops extends OpMap>(ops: Ops): ExtendResult<S, Ops>;
   // Deferred checked first — otherwise a Deferred's .pipe() would
   // collapse to unknown (Bound's arm).
   pipe<Fns extends ChainFns<S>>(
