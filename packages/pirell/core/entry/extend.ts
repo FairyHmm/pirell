@@ -2,6 +2,22 @@ import type { Op } from "../types/base.js";
 import type { OpMap } from "./assemble.js";
 import { valueOf } from "./surface.js";
 
+/**
+ * Wires new ops onto a surface. Accepts anything registrable: a data
+ * op, or a factory yielding one once applied.
+ *
+ * ```ts
+ * import { pirell } from "@pirell/core";
+ *
+ * const double = () => (ns: number[]) => ns.map((n) => n * 2);
+ * const $ = pirell().extend({ double });
+ * $([1, 2]).double().value; // [2, 4]
+ * ```
+ *
+ * Published compositions annotate the result `Extended<typeof ops>`
+ * (see `Extended`); shape checking fires at each op call, not at
+ * registration.
+ */
 export function extend<Ops extends OpMap>(surface: any, ops: Ops): any;
 export function extend<Ops extends OpMap>(ops: Ops): (surface: any) => any;
 // Data op only: a factory applied here would take the data as its key

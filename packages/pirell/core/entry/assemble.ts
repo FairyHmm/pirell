@@ -8,7 +8,22 @@ import type { Assembled, OpMap } from "../types/assembled.js";
 
 export type { Assembled, OpMap };
 
+/**
+ * Binds data to a fluent surface. The shape is proven from the data;
+ * each chained op is checked against it, and `.value` unwraps the
+ * result.
+ *
+ * ```ts
+ * import { pirell } from "@pirell/core";
+ *
+ * pirell([1, 2]).value; // [1, 2]
+ * ```
+ */
 export function pirell<T>(data: T): Assembled<Bound<ShapeOf<T>>>;
+/**
+ * Builds a deferred surface: no data yet, ops register for later.
+ * Calling it with data binds and runs everything registered.
+ */
 export function pirell(): Assembled<Deferred<[]>>;
 export function pirell(...args: [unknown] | []): unknown {
   if (args.length === 0) {

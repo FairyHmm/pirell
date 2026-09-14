@@ -12,9 +12,11 @@ import type {
 
 // --- Shape → type ---
 
-// DataOf<S>: shape → concrete TS type, inverse of ShapeOf below. A
-// Shape's elements form one recursive descent, not siblings —
-// ["k",["i",number]] is "keyed container of arrays of number".
+/**
+ * Maps a shape to its concrete TS type, inverse of {@linkcode ShapeOf}.
+ * A shape's elements form one recursive descent, not siblings:
+ * `["k", ["i", number]]` is "keyed container of arrays of number".
+ */
 export type DataOf<S extends Shape> = S extends []
   ? unknown
   : S extends ["..."]
@@ -60,8 +62,11 @@ export type IsUnion<T, U = T> = T extends U
     : true
   : never;
 
-// Single-evaluates ShapeOfElem via infer R (re-spelling it cost ~2.5x)
-// and narrows the result to Shape.
+/**
+ * Derives a shape from a bare literal, so calls need no `as Raw<S>`
+ * cast. Inverse of {@linkcode DataOf}: same ladder, opposite
+ * direction.
+ */
 export type ShapeOf<D> = ShapeOfElem<D> extends infer R extends Shape
   ? R
   : never;

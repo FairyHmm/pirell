@@ -2,23 +2,29 @@ import type { DataOf } from "./codec.js";
 
 // --- Dim & Elem representation ---
 
+/** Positional (`"i"`) vs named (`"k"`) fork — the two JSON shapes. */
 export type Dim = "i" | "k";
 
-// Branch: nested Shape, leaf type, or object — `unknown` excluded because it
-// absorbs unions and collapses comparisons.
+/**
+ * A nested shape, a leaf type, or an object. `unknown` excluded: it
+ * absorbs unions and collapses comparisons.
+ */
 export type Branch =
   Shape | (string & {}) | (number & {}) | (boolean & {}) | object;
 
-// JSON's positional vs. named fork for a Mixed node's children, kept
-// distinct rather than force-unified.
+/**
+ * A mixed node's children: positional (`Branch[]`) vs named
+ * (`Record`), kept distinct rather than force-unified.
+ */
 export type Variants = Branch[] | Record<string, Branch>;
 
-// "i..."/"k..." = Dim + heterogeneous children.
+/** `"i..."` / `"k..."`: a dimension with heterogeneous children. */
 export type MixedTag = `${Dim}...`;
 
+/** One shape element: bare dim, mixed tag, or a declared pair. */
 export type Elem = Dim | MixedTag | [Dim, Branch] | [MixedTag, Variants];
 
-// Bare-tag → dim lookup for ElemCase's mixed arms (avoids template inference).
+/** Bare-tag to dim lookup for `ElemCase`'s mixed arms. */
 export type DimTable = {
   i: "i";
   "i...": "i";
@@ -26,11 +32,17 @@ export type DimTable = {
   "k...": "k";
 };
 
-// Open-tail applies only to nested Shape; Mixed/MixedTag are terminal.
+/**
+ * A shape: elements plus an optional open tail. Tails apply to nested
+ * shapes only; mixed tags are terminal.
+ */
 export type Shape = Elem[] | [...Elem[], "..."];
 
-// Single canonical Elem classifier — matchers branch off its fields.
-// Bare-vs-declared must stay visible: it drives the matcher's continuation.
+/**
+ * The canonical `Elem` classifier — matchers branch off its fields.
+ * Bare-vs-declared stays visible: it drives the matcher's
+ * continuation.
+ */
 export type ElemCase<E extends Elem> = E extends Dim
   ? { dim: E; kind: "leaf"; branch: never; variants: never }
   : E extends MixedTag
@@ -48,40 +60,53 @@ export type ElemCase<E extends Elem> = E extends Dim
 
 // Unbranded: the old unique-symbol brand was never structurally tested
 // by any consumer, and a private symbol can't be named by packages
-// re-exporting it (TS4023 → TS7056). Unknown-guard kept — it collapses
-// unshaped claims to plain unknown instead of an unsatisfiable type.
+// re-exporting it (TS4023 → TS7056).
+/**
+ * `DataOf` with an unknown-guard: unshaped claims collapse to plain
+ * `unknown` instead of an unsatisfiable type.
+ */
 export type Raw<S extends Shape> = [unknown] extends [DataOf<S>]
   ? unknown
   : DataOf<S>;
 
-// Data carries its own In (a single-stage fn); parameterized ops are
-// factories returning Op — the surface applies args, then checks once.
+/**
+ * A shape-claimed data function. Data carries its own `In`; parameterized
+ * ops are factories returning `Op` — the surface applies args, then
+ * checks once.
+ */
 export type Op<In extends Shape, Out extends Shape> = (
   data: DataOf<In>,
 ) => Raw<Out>;
 
-// Anything registrable via .extend(): a data op, or a factory that
-// yields one once applied. Runtime applies args-then-data uniformly.
-// Both arms return `(data: any) => any` — Op<any, any>'s param resolves
-// to DataOf<any> = unknown, which would reject any aliased concrete op
-// (TS only fast-path-compares direct Op instantiations), and the raw
-// factory output is exactly what runOp applies. Fluent still gates real
-// per-call shapes, so 'any' here is a container check only.
+// Both arms return `(data: any) => any` — `Op<any, any>`'s param resolves
+// to `DataOf<any>` = unknown, which would reject any aliased concrete op
+// (TS only fast-path-compares direct Op instantiations).
+/**
+ * Anything registrable via `.extend()`: a data op, or a factory
+ * yielding one once applied. The `any`s are a container check only —
+ * `Fluent` still gates real per-call shapes, and the raw factory
+ * output is exactly what `runOp` applies.
+ */
 export type OpLike =
   | ((data: any) => any)
   | ((...args: any[]) => (data: any) => any);
 
-// Type-level tag for a data-bound surface. Forward-declared here to avoid
-// a circular dependency; named Bound (not Wrapper) so it doesn't collide
-// with the runtime class of the same concept (see type-safety.md).
+/**
+ * Type-level tag for a data-bound surface: shape `S` proven from data.
+ * Named `Bound` (not `Wrapper`) to avoid colliding with the runtime
+ * class of the same concept.
+ */
 export interface Bound<S extends Shape> {
   readonly __shape?: S;
   value: unknown;
 }
 
-// Deliberately bare: the rich Ops-aware call signature cost ~2,354
-// insts to merely declare. It lives in assembled.ts instead, applied
-// via intersection (runtime invoke unaffected — type-level only).
+/**
+ * A surface with no data yet: calling it binds data. Deliberately
+ * bare — the rich ops-aware call signature cost ~2,354 insts merely
+ * to declare, so it lives in `assembled.ts`, applied via intersection
+ * (runtime invoke unaffected — type-level only).
+ */
 export interface Deferred<Out extends Shape> {
   (data: unknown): Bound<Out>;
   readonly value: undefined;

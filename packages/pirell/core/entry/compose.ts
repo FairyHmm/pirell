@@ -34,8 +34,20 @@ export function composeRaw(...fns: Array<(x: any) => any>): (x: any) => any {
     }, x);
 }
 
-// Returns a function — data is applied later, checked then against the
-// first link's entry claim.
+/**
+ * Runs functions left to right, returning a reusable pipeline — data
+ * is applied later, checked then against the first link's entry claim.
+ *
+ * ```ts
+ * import { compose } from "@pirell/core";
+ *
+ * const run = compose(
+ *   (ns: number[]) => ns.map((n) => n * 2),
+ *   (ns: number[]) => ns.filter((n) => n > 2),
+ * );
+ * run([1, 2]); // [4]
+ * ```
+ */
 export function compose<Fns extends unknown[]>(
   ...fns: Fns & ComposeChain<Fns>
 ): (data: FirstData<Fns>) => ComposeResult<Fns>;
@@ -50,4 +62,17 @@ type PipeFn = <Fns extends unknown[]>(
   ...fns: Fns & ComposeChain<Fns>
 ) => ComposeResult<Fns>;
 
+/**
+ * Data-first {@linkcode compose}: threads data through each function
+ * left to right.
+ *
+ * ```ts
+ * import { pipe } from "@pirell/core";
+ *
+ * pipe(
+ *   [1, 2],
+ *   (ns: number[]) => ns.map((n) => n * 2),
+ * ); // [2, 4]
+ * ```
+ */
 export const pipe: PipeFn = makeFlat(compose) as unknown as PipeFn;

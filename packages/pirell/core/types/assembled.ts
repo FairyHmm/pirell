@@ -7,11 +7,14 @@ import type { Tail } from "./chain.js";
 import type { IsUnion, ShapeOf } from "./codec.js";
 import type { OpMethods } from "./fluent.js";
 
+/** A method table: names to registrable ops. */
 export type OpMap = Record<string, OpLike>;
 
-// Unwraps a surface's bound value (paired with CurrentShp below — the
-// two must stay in lockstep). Deferred checked FIRST: it structurally
-// satisfies Bound too, so Bound-first would misroute it.
+/**
+ * Reads a surface's bound value (paired with {@linkcode CurrentShp} —
+ * the two must stay in lockstep). Deferred checked first: it
+ * structurally satisfies `Bound` too, so Bound-first would misroute it.
+ */
 export type CurrentData<S> =
   S extends Deferred<infer Out extends Shape>
     ? Raw<Out>
@@ -19,7 +22,7 @@ export type CurrentData<S> =
       ? Raw<Shp>
       : never;
 
-// The surface's current proven Shape, read fresh at each Fluent call.
+/** The surface's current proven shape, read fresh at each `Fluent` call. */
 export type CurrentShp<S> =
   S extends Deferred<infer Out extends Shape>
     ? Out
@@ -27,11 +30,13 @@ export type CurrentShp<S> =
       ? Shp
       : ["..."];
 
-// Collapses Shp/Ops before the nested <T> call signature sees them:
-// threading extend<Ops>'s still-open params straight through two generic
-// layers cost 380K insts + TS7056 (probe, HANDOFF) — ~54K once resolved
-// here. Omit drops the bare Deferred call signature, which would
-// otherwise silently swallow the Ops re-wire.
+/**
+ * Collapses Shp/Ops before the nested call signature sees them:
+ * threading still-open params through two generic layers cost 380K
+ * insts + TS7056 (~54K once resolved here). `Omit` drops the bare
+ * `Deferred` call signature, which would otherwise silently swallow
+ * the ops re-wire.
+ */
 export type ResolvedOpsDeferred<
   Shp extends Shape,
   Ops extends OpMap,
@@ -48,18 +53,23 @@ export type ResolvedOpsDeferred<
 
 type ChainFns<S> = [(arg: CurrentData<S>) => any, ...Array<(arg: any) => any>];
 
-// Deferred-only compose member. An interface so .d.ts emit references it
-// by name instead of re-inlining Tail's machinery at every Deferred use.
+/**
+ * Deferred-only `compose`. An interface so `.d.ts` emit references it
+ * by name instead of re-inlining `Tail`'s machinery at every use.
+ */
 export interface IComposable<S> {
   compose<Fns extends ChainFns<S>>(
     ...fns: Fns & Tail<Fns, CurrentData<S>>
   ): Assembled<S>;
 }
 
-// What surface.extend(ops) returns, named once so publishers (and our
-// own packages) can annotate composed surfaces for JSR's explicit-type
-// rule instead of re-spelling the conditional. ISurface.extend below is
-// defined as this alias — single source of truth, no drift.
+/**
+ * What `surface.extend(ops)` returns, named once so publishers (and
+ * our own packages) can annotate composed surfaces for JSR's
+ * explicit-type rule instead of re-spelling the conditional.
+ * `ISurface.extend` is defined as this alias — single source of
+ * truth, no drift.
+ */
 type ExtendResult<S, Ops extends OpMap> =
   S extends Deferred<any>
     ? IsUnion<keyof Ops> extends true
@@ -85,29 +95,51 @@ type ExtendResult<S, Ops extends OpMap> =
         : never
     : Assembled<S> & OpMethods<Ops, S>;
 
-// The common composition: pirell().extend(ops) — deferred surface, ops
-// re-wired. Annotate published compositions as Extended<typeof ops>.
+/**
+ * The common composition: `pirell().extend(ops)` — deferred surface,
+ * ops re-wired. Annotate published compositions as
+ * `Extended<typeof ops>`.
+ *
+ * ```ts
+ * import { pirell } from "@pirell/core";
+ * import type { Extended } from "@pirell/core";
+ *
+ * const ops = { double: () => (ns: number[]) => ns.map((n) => n * 2) };
+ * const $: Extended<typeof ops> = pirell().extend(ops);
+ * $([1, 2]).double().value; // [2, 4]
+ * ```
+ */
 export type Extended<Ops extends OpMap> = ExtendResult<Deferred<[]>, Ops>;
 
-// A chained data-bound surface: pirell(data).op(...).op(...) — data of
-// shape Out with the same ops still callable. Annotate published chains
-// as BoundWith<typeof ops, Out>.
+/**
+ * A chained data-bound surface: `pirell(data).op(...).op(...)` — data
+ * of shape `Out` with the same ops still callable. Annotate published
+ * chains as `BoundWith<typeof ops, Out>`.
+ */
 export type BoundWith<Ops extends OpMap, Out extends Shape> = Assembled<
   Bound<Out>
 > &
   OpMethods<Ops, Bound<Out>>;
 
-// A surface's methods, as an interface so .d.ts emit keeps it by name
-// instead of re-expanding extend/pipe's conditionals at every surface
-// (type aliases inline in emit; interfaces are referenced by name).
-// The data type itself (S) stays an intersection underneath.
+/**
+ * A surface's methods, as an interface so `.d.ts` emit keeps it by
+ * name instead of re-expanding `extend`/`pipe`'s conditionals at every
+ * surface (aliases inline in emit; interfaces are referenced by name).
+ * The data type itself (`S`) stays an intersection underneath.
+ */
 export interface ISurface<S> {
-  // A single op narrows S to its Out; union ops are un-narrowable, so
-  // the Deferred surface is kept with only Ops re-wired (fresh register
-  // call then stays deferred rather than dropping the ops).
+  /**
+   * Wires ops onto the surface. A single op narrows `S` to its `Out`;
+   * union ops are un-narrowable, so the deferred surface is kept with
+   * only ops re-wired (a fresh register call then stays deferred
+   * rather than dropping the ops).
+   */
   extend<Ops extends OpMap>(ops: Ops): ExtendResult<S, Ops>;
-  // Deferred checked first — otherwise a Deferred's .pipe() would
-  // collapse to unknown (Bound's arm).
+  /**
+   * Threads the bound value through functions, or appends them lazily
+   * on a deferred surface. Deferred checked first — otherwise a
+   * deferred `.pipe()` would collapse to unknown (Bound's arm).
+   */
   pipe<Fns extends ChainFns<S>>(
     ...fns: Fns & Tail<Fns, CurrentData<S>>
   ): S extends Deferred<any>
@@ -117,9 +149,12 @@ export interface ISurface<S> {
       : Assembled<S>;
 }
 
-// .extend() always accepts; shape checking fires on Fluent's return
-// (its mismatch arm is uncallable), not at registration. Deferred-only
-// compose rides in via the IComposable conditional.
+/**
+ * The decorated `pirell()` surface: methods plus data, plus
+ * deferred-only `compose`. `.extend()` always accepts; shape checking
+ * fires on `Fluent`'s return (its mismatch arm is uncallable), not at
+ * registration.
+ */
 export type Assembled<S> = ISurface<S> &
   S &
   (S extends Deferred<any> ? IComposable<S> : unknown);

@@ -1,7 +1,10 @@
 import type { Dim } from "../types/base.js";
 
-// Bare data-bound surface (value only, no methods, untyped): the lean
-// entry for callers who don't need assemble.ts's shape-inferring surface.
+/**
+ * Bare data-bound surface: value only, no methods, untyped. The lean
+ * entry for callers who don't need the shape-inferring surface —
+ * never holds `undefined`.
+ */
 export class Wrapper<S> {
   constructor(public readonly value: unknown) {
     // Mirror pirell(undefined): a Wrapper must never hold undefined.

@@ -6,8 +6,9 @@ import type { Bound, Op, OpLike, Shape } from "./base.js";
 import type { MatchShape } from "./match-shape.js";
 import type { Assembled, CurrentShp, OpMap } from "./assembled.js";
 
-// Named failure type instead of bare `never`, so a mismatch's error
-// message names what didn't match rather than showing an opaque never.
+/**
+ * Names a shape mismatch in error output instead of an opaque `never`.
+ */
 export type ShapeMismatch<In extends Shape, Actual extends Shape> = {
   readonly __pirellShapeMismatch: true;
   expected: In;
@@ -38,6 +39,13 @@ type OutOf<RD extends unknown> = [unknown] extends [RD]
       ? ["k", "..."]
       : never;
 
+/**
+ * A wired surface method: matches the op's claim against the surface's
+ * proven shape, re-wiring sibling ops onto the output. The check fires
+ * at the call; unfit siblings turn uncallable rather than vanishing,
+ * and the failure arm sits outside the arrow so a mismatched call
+ * itself is uncallable (TS2349).
+ */
 export type Fluent<F extends OpLike, S, Ops extends OpMap = {}> =
   // Signature split from its Op result first: producting a function's
   // (args) => Op<...> in one pattern can't see an Op behind a return
@@ -72,6 +80,9 @@ export type Fluent<F extends OpLike, S, Ops extends OpMap = {}> =
 // One shared definition instead of six inline copies at the surface
 // return sites — each copy was an independently solved instantiation.
 // Interfaces can't extend a mapped type (TS2312), so this stays an alias.
+/**
+ * A surface's ops as callable methods, each wired by {@linkcode Fluent}.
+ */
 export type OpMethods<Ops extends OpMap, S> = {
   [P in keyof Ops]: Fluent<Ops[P], S, Ops>;
 };
