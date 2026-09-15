@@ -68,8 +68,10 @@ export const sort =
  */
 export const slice =
   (start?: number, end?: number): Rewrap =>
-  (data) =>
-    data.slice(start ?? 0, end);
+  (data) => {
+    const from = start ?? 0;
+    return end === undefined ? data.slice(from) : data.slice(from, end);
+  };
 
 /**
  * Flattens nested arrays.
