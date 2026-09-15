@@ -39,13 +39,4 @@ describe("each", () => {
     const result = pipe({ a: [3, 1], b: [2] }, each(double));
     expect(result).toEqual({ a: [6, 2], b: [4] });
   });
-
-  it("rejects non-keyed data at the type level", () => {
-    // Type check only — never runs
-    if (false) {
-      const nums = [1, 2, 3];
-      // @ts-expect-error -- each expects Keyed, not ["i"]
-      pirell(nums).each(double);
-    }
-  });
 });

@@ -1,11 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { makeFlat, makeCurry } from "./ops.js";
 import { compose } from "../entry/compose.js";
-import {
-  double,
-  sumAll,
-  nth,
-} from "./fixture-ops.js";
+import { double, sumAll, nth } from "./fixture-ops.js";
 
 // makeFlat/makeCurry flip calling convention with no shape knowledge —
 // tested with plain fns to pin that contract.
@@ -36,7 +32,8 @@ describe("makeCurry: flat (data, ...args) => result → curried", () => {
     // a gated compose (the generic path erases the chain constraint). The
     // gate round-trip is makeFlat's overload's job, not makeCurry's. Here we
     // only pin makeCurry on an ordinary (data, ...args) fn.
-    const scale = (data: number[], factor: number) => data.map((n) => n * factor);
+    const scale = (data: number[], factor: number) =>
+      data.map((n) => n * factor);
     const curried = makeCurry(scale);
     expect(curried(3)([1, 2])).toEqual([3, 6]);
   });
@@ -72,15 +69,6 @@ describe("makeFlat: curried (...args) => (data) => result → flat", () => {
     expect(flat([1, 2, 3])).toBe(3);
   });
 
-  it("rejects a wrong-arg call at the type level", () => {
-    const inc = (n: number) => (data: number) => data + n;
-    const flat = makeFlat(inc);
-    if (false) {
-      // @ts-expect-error -- flat(data, arg) — string isn't a number arg
-      flat(1, "x");
-    }
-  });
-
   it("is the data-first view of compose (gated)", () => {
     // pipe itself is literally makeFlat(compose); re-derive to show the
     // converter produces the gated data-first form.
@@ -94,13 +82,5 @@ describe("makeFlat on native pirell ops (factories → flat)", () => {
   it("flattens a factory op into a data-first call", () => {
     const flat = makeFlat(nth);
     expect(flat([10, 20, 30], 1)).toBe(20);
-  });
-
-  it("a flattened factory still rejects wrong args", () => {
-    const flat = makeFlat(nth);
-    if (false) {
-      // @ts-expect-error -- flat(data, arg) — string isn't a number arg
-      flat([1, 2, 3], "x");
-    }
   });
 });

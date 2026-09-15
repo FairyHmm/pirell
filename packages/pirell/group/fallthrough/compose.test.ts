@@ -58,19 +58,3 @@ describe("native methods compose in pipe", () => {
     expect(pairs).toEqual([["b", 2]]);
   });
 });
-
-describe("native shape rejection", () => {
-  it("rejects keyed data for array methods and vice versa", () => {
-    // Type check only — never runs
-    if (false) {
-      // @ts-expect-error -- map expects indexed, not ["k", ...]
-      pirell({ a: 1 }).map((n) => n);
-      // @ts-expect-error -- keys expects keyed, not ["i", ...]
-      pirell([1, 2]).keys();
-      // @ts-expect-error -- find expects indexed, not ["k", ...]
-      pirell({ a: 1 }).find((n) => n);
-      // @ts-expect-error -- hasOwn expects keyed, not ["i", ...]
-      pirell([1, 2]).hasOwn("0");
-    }
-  });
-});

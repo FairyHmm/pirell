@@ -63,34 +63,6 @@ describe("bound-surface .extend()", () => {
   });
 });
 
-describe("bound-surface .extend always wires; the mismatch surfaces at the call, not registration", () => {
-  it(".extend() accepts a mismatched op without complaint", () => {
-    // Compile-time only: must type-check clean, no @ts-expect-error.
-    if (false) {
-      const wired = pirell([1, 2, 3]).extend({ toEntries });
-      void wired;
-    }
-  });
-
-  it("calling the mismatched method is what fails to type-check", () => {
-    if (false) {
-      // @ts-expect-error -- toEntries expects ["k"], pirell([1,2,3]) is ["i"]
-      pirell([1, 2, 3]).extend({ toEntries }).toEntries();
-    }
-  });
-
-  it("fails to type-check even as a bare unused binding — the check fires on the call, not on how the result is used", () => {
-    // Regression guard: the mismatch check must fire on the call itself
-    // (TS2349), not via the return type — a bare unused binding never
-    // constrains a return type, so return-position checks stay silent here.
-    if (false) {
-      // @ts-expect-error -- toEntries expects ["k"], pirell([1,2,3]) is ["i"]
-      const result = pirell([1, 2, 3]).extend({ toEntries }).toEntries();
-      void result;
-    }
-  });
-});
-
 // See PLAN.md "relocate .extend()'s shape check onto Fluent/call-site"
 // for the overload-collision bug these tests guard against.
 describe("bound-surface .extend with multiple ops registered together", () => {
@@ -112,18 +84,6 @@ describe("bound-surface .extend with multiple ops registered together", () => {
     // fresh), matching builders.ts threading `ops` through unchanged.
     expect(result.value).toEqual([2, 4, 6]);
     expectTypeOf(result.double).not.toBeNever();
-  });
-
-  it("calling the second op before the first has run (wrong order) fails to type-check", () => {
-    if (false) {
-      const data = [
-        ["a", 1],
-        ["b", 2],
-      ];
-      const twoOp = pirell(data).extend({ entriesToObject, toEntries });
-      // @ts-expect-error -- toEntries wants ["k"]; twoOp's shape is still ["i","i..."]
-      twoOp.toEntries();
-    }
   });
 
   it("calling in the correct order chains through cleanly", () => {

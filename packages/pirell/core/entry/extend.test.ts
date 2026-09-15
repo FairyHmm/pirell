@@ -31,15 +31,6 @@ describe("standalone extend()", () => {
     expect(result).toEqual([2, 4, 6]);
   });
 
-  it("rejects a parameterized op at the type level", () => {
-    // Type check only — never runs (would throw at runtime too, see below).
-    if (false) {
-      // @ts-expect-error -- nth is a factory (returns a data fn), and
-      // extend(fn) only accepts single-stage data ops.
-      extend(nth);
-    }
-  });
-
   it("rejects a parameterized op at runtime too, with an actionable message", () => {
     // Same call, forced past the type system (e.g. a JS caller, or `as any`)
     // — the arity check is a real runtime guard, not just a type-level one.

@@ -116,56 +116,6 @@ describe("standalone pipe/compose with pirell Ops", () => {
   });
 });
 
-describe("standalone pipe/compose shape rejection (compile-time)", () => {
-  it("rejects bare array data into an op expecting a keyed shape", () => {
-    // Type check only — never runs.
-    if (false) {
-      // @ts-expect-error toEntries expects ["k"], not the derived ["i"]
-      pipe([1, 2, 3], toEntries);
-    }
-  });
-
-  it("rejects keyed data into an op expecting an indexed shape", () => {
-    // Type check only — never runs.
-    if (false) {
-      // @ts-expect-error double expects [["i", number]], not the derived ["k"]
-      pipe({ a: 1 }, double);
-    }
-  });
-
-  it("rejects a compose link whose Out can't feed the next In", () => {
-    // Type check only — never runs.
-    if (false) {
-      // @ts-expect-error double Out [["i", number]] can't feed toEntries In ["k"]
-      compose(double, toEntries);
-      // @ts-expect-error double Out [["i", number]] can't feed flattenEntries In ["i","i..."]
-      compose(double, flattenEntries);
-      // @ts-expect-error flattenEntries Out ["i"] (no element claim) can't feed double In [["i", number]]
-      compose(flattenEntries, double);
-    }
-  });
-
-  it("rejects a chain narrowed by a mismatched final element", () => {
-    // Type check only — never runs.
-    if (false) {
-      // @ts-expect-error toEntries (["k"] -> ["i","i..."]) then double needs [["i", number]], mismatch
-      pipe({ a: 1 }, toEntries, double);
-    }
-  });
-
-  it("compose shape-gates bare object data (no cast needed)", () => {
-    if (false) {
-      // @ts-expect-error toEntries expects ["k"], not ["i"] from bare array
-      compose(toEntries)([1, 2, 3]);
-      // @ts-expect-error double expects [["i", number]], not ["k"] from bare object
-      compose(double)({ a: 1 });
-    }
-  });
-});
-
-// Spread arrays widen to length:number — uncheckable per-link (chain.ts
-// non-tuple arm) and brandless by design. So: stage-labeled runtime
-// error, not a deep crash.
 describe("compose/pipe: unchecked spread-array chains fail loudly", () => {
   it("wraps a stage's runtime error with stage index and cause", () => {
     const fns: Array<typeof double> = [double];

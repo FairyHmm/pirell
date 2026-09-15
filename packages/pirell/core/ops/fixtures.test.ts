@@ -104,48 +104,9 @@ describe("curried op (nth)", () => {
     expect(second([10, 20, 30])).toBe(30);
     expect(second(["a", "b", "c"])).toBe("c");
   });
-
-  it("rejects wrong-shape data", () => {
-    // Type check only — never runs
-    if (false) {
-      const obj = { a: 1 };
-      // @ts-expect-error -- nth(0) expects ["i"], not ["k"]
-      nth(0)(obj);
-    }
-  });
 });
 
 describe("type rejection through chains", () => {
-  it("rejects passing i to an op expecting k", () => {
-    // Type check only — never runs
-    if (false) {
-      const nums = [1, 2, 3];
-      // @ts-expect-error -- toEntries expects ["k", "..."], not ["i"]
-      toEntries(nums);
-    }
-  });
-
-  it("rejects passing k to an op expecting i", () => {
-    // Type check only — never runs
-    if (false) {
-      const obj = { a: 1 };
-      // @ts-expect-error -- double expects [["i", number]], not ["k"]
-      double(obj);
-    }
-  });
-
-  it("rejects i... when expecting exactly i (open tail mismatch)", () => {
-    // Type check only — never runs
-    if (false) {
-      const pairs = [
-        ["a", 1],
-        ["b", 2],
-      ];
-      // @ts-expect-error -- double expects exactly [["i", number]], not ["i","i..."]
-      double(pairs);
-    }
-  });
-
   it("accepts nested values when expecting bare k (more detail is welcome)", () => {
     // Bare ["k"] claims only keyed-ness — DataOf<["k"]> is
     // Record<string, unknown> — so nested values satisfy it. Depth

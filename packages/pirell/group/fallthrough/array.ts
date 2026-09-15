@@ -22,8 +22,9 @@ export type Rewrap = Op<Indexed, Indexed>;
 export type Terminal = Op<Indexed, []>;
 /**
  * Walker over `(row, index)`. Caller types values; shapes stay the
- * library's business.
+ * library's business, callback infer type from call-site.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- row type is caller-supplied, see doc comment above
 export type ArrayCallback = (row: any, index: number) => any;
 
 /**
@@ -33,7 +34,7 @@ export type ArrayCallback = (row: any, index: number) => any;
  */
 export const map =
   (fn: ArrayCallback): Rewrap =>
-  (data) =>
+  (data): unknown[] =>
     data.map(fn);
 
 /**
@@ -50,9 +51,11 @@ export const filter =
  * Sorts a copy — never mutates the input.
  *
  * @param compare Ordering function; without one, elements sort by
- * string conversion (native).
+ * string conversion (native). Same caller-types-values contract as
+ * {@linkcode ArrayCallback}.
  */
 export const sort =
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- comparand type is caller-supplied, see doc comment above
   (compare?: (a: any, b: any) => number): Rewrap =>
   (data) =>
     data.toSorted(compare);
@@ -85,7 +88,7 @@ export const flat =
  */
 export const flatMap =
   (fn: ArrayCallback): Rewrap =>
-  (data) =>
+  (data): unknown[] =>
     data.flatMap(fn);
 
 /**
@@ -94,8 +97,8 @@ export const flatMap =
  * @param items Values and arrays to append.
  */
 export const concat =
-  (...items: any[]): Rewrap =>
-  (data) =>
+  (...items: unknown[]): Rewrap =>
+  (data): unknown[] =>
     data.concat(...items);
 
 /**
@@ -112,8 +115,8 @@ export const reverse = (): Rewrap => (data) => data.toReversed();
  * @param value Replacement value.
  */
 export const with_ =
-  (index: number, value: any): Rewrap =>
-  (data) =>
+  (index: number, value: unknown): Rewrap =>
+  (data): unknown[] =>
     data.with(index, value);
 
 /**
@@ -124,9 +127,11 @@ export const with_ =
  * @param items Elements to insert in their place.
  */
 export const toSpliced =
-  (start: number, deleteCount?: number, ...items: any[]): Rewrap =>
-  (data) =>
-    data.toSpliced(start, deleteCount as number, ...items);
+  (start: number, deleteCount?: number, ...items: unknown[]): Rewrap =>
+  (data): unknown[] =>
+    deleteCount === undefined
+      ? data.toSpliced(start)
+      : data.toSpliced(start, deleteCount, ...items);
 
 /**
  * Returns the first match, or `undefined`.
@@ -187,7 +192,7 @@ export const at =
 export const arrayJoin =
   (separator?: string): Terminal =>
   (data) =>
-    data.join(separator);
+    separator === undefined ? data.join() : data.join(separator);
 
 /**
  * Answers whether any element matches.
@@ -216,9 +221,11 @@ export const every =
  * @param fromIndex Where to start searching.
  */
 export const indexOf =
-  (value: any, fromIndex?: number): Terminal =>
+  (value: unknown, fromIndex?: number): Terminal =>
   (data) =>
-    data.indexOf(value, fromIndex);
+    fromIndex === undefined
+      ? data.indexOf(value)
+      : data.indexOf(value, fromIndex);
 
 /**
  * Returns the last occurrence position, or `-1`. An omitted
@@ -228,7 +235,7 @@ export const indexOf =
  * @param value Value to search for.
  */
 export const lastIndexOf =
-  (value: any, ...rest: [fromIndex?: number]): Terminal =>
+  (value: unknown, ...rest: [fromIndex?: number]): Terminal =>
   (data) => {
     // Explicit-undefined fromIndex coerces to 0 in native lastIndexOf —
     // keep the omitted form forwarding no second argument (as reduce).
@@ -244,9 +251,11 @@ export const lastIndexOf =
  * @param fromIndex Where to start searching.
  */
 export const includes =
-  (value: any, fromIndex?: number): Terminal =>
+  (value: unknown, fromIndex?: number): Terminal =>
   (data) =>
-    data.includes(value, fromIndex);
+    fromIndex === undefined
+      ? data.includes(value)
+      : data.includes(value, fromIndex);
 
 /** Counts elements. Also works standalone: `pipe(rows, length)`. */
 export const length: Terminal = (data) => data.length;
