@@ -15,23 +15,23 @@ import type { Assembled, OpMap } from "../types/assembled.js";
 // Zero-arg calls are ambiguous (data op vs all-optional-arg factory);
 // the result resolves it. A Registration is returned as-is so applyOp
 // can branch on it structurally.
-const runOp = (op: OpLike, args: any[], data: unknown): unknown => {
+const runOp = (op: OpLike, args: unknown[], data: unknown): unknown => {
   if (args.length === 0) {
     const direct = (op as (data: unknown) => unknown)(data);
     if (isRegistration(direct)) {
       return direct;
     }
     if (typeof direct === "function") {
-      const stage = (op as (...a: any[]) => (d: unknown) => unknown)();
+      const stage = (op as (...a: unknown[]) => (d: unknown) => unknown)();
       if (typeof stage === "function") {
         return stage(data);
       }
     }
     return direct;
   }
-  const result = (op as (...a: any[]) => (data: unknown) => unknown)(...args)(
-    data,
-  );
+  const result = (op as (...a: unknown[]) => (data: unknown) => unknown)(
+    ...args,
+  )(data);
   return result;
 };
 

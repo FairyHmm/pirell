@@ -17,10 +17,11 @@ import {
 // groupBy partitions keyed rows.
 const groupBy = ((key: string) => (data: unknown) => {
   const rows = data as Record<string, unknown>[];
-  const groups: Record<string, Record<string, unknown>[]> = Object.create(null);
+  const groups: Record<string, Record<string, unknown>[]> = {};
   for (const row of rows) {
     const k = String(row[key]);
-    (groups[k] ||= []).push(row);
+    const bucket = (groups[k] ||= []);
+    bucket.push(row);
   }
   return groups;
 }) as unknown as (key: string) => Op<["i", "k", "..."], ["k", "i", "k", "..."]>;

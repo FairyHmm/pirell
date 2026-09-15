@@ -10,7 +10,7 @@ export const isSurface = (x: unknown): x is Record<PropertyKey, unknown> =>
   x !== null &&
   x !== undefined &&
   (typeof x === "function" || typeof x === "object") &&
-  SURFACE in (x as Record<PropertyKey, unknown>);
+  SURFACE in x;
 
 /** Unwraps a surface to its raw value; passes anything else through. */
 export const valueOf = (x: unknown): unknown => (isSurface(x) ? x.value : x);
@@ -28,4 +28,4 @@ export const isRegistration = (x: unknown): x is Registration =>
   x !== null &&
   x !== undefined &&
   typeof x === "object" &&
-  REGISTER in (x as Record<PropertyKey, unknown>);
+  REGISTER in x;
