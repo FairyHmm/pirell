@@ -17,6 +17,7 @@ describe("each", () => {
   });
 
   it("chains: sibling ops re-wire onto the keyed result", () => {
+    // `each` is already a core op on pirell() — only listValues is new.
     const values = pirell({ a: [3, 1], b: [2] })
       .extend({ listValues })
       .each(double)

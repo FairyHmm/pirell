@@ -21,7 +21,7 @@
  * @module
  */
 import { pirell as pirellRaw } from "@pirell/core";
-import type { Extended } from "@pirell/core";
+import type { CoreOps, Extended } from "@pirell/core";
 import { groupingMethods } from "./groups.js";
 import { arrayFallthroughMethods } from "./fallthrough/array.js";
 import { objectFallthroughMethods } from "./fallthrough/object.js";
@@ -33,15 +33,13 @@ export * from "./fallthrough/object.js";
 /**
  * Every op on the surface, as data for `extend`: grouping plus the
  * array/object fallthroughs. Spread in your own ops to compose a
- * custom API — see `Extended` from `@pirell/core`.
+ * custom API — see {@linkcode Extended}.
  */
 export const groupMethods = {
   ...groupingMethods,
   ...arrayFallthroughMethods,
   ...objectFallthroughMethods,
 };
-// The deferred surface with the group ops re-wired. tsc verifies the
-// match against .extend() at each build.
 /** The ops map behind {@linkcode pirell}, as a type for composition. */
 export type GroupOps = typeof groupMethods;
 /**
@@ -53,4 +51,5 @@ export type GroupOps = typeof groupMethods;
  * pirell([3, 1, 2]).sort().value; // [1, 2, 3]
  * ```
  */
-export const pirell: Extended<GroupOps> = pirellRaw().extend(groupMethods);
+export const pirell: Extended<CoreOps & GroupOps> =
+  pirellRaw().extend(groupMethods);
