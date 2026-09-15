@@ -87,9 +87,9 @@ export function measure(fileContent: string): Measurement {
     console.log(
       `(note: ${other} error(s) outside the stress file — ignored)`,
     );
-  const inst = Number(stdout.match(/Instantiations:\s+(\d+)/)?.[1]);
-  const check = Number(stdout.match(/Check time:\s+([\d.]+)s/)?.[1]);
-  const types = Number(stdout.match(/^Types:\s+(\d+)/m)?.[1]);
+  const inst = Number(/Instantiations:\s+(\d+)/.exec(stdout)?.[1]);
+  const check = Number(/Check time:\s+([\d.]+)s/.exec(stdout)?.[1]);
+  const types = Number(/^Types:\s+(\d+)/m.exec(stdout)?.[1]);
   if (!Number.isFinite(inst))
     throw new Error("could not parse tsc --extendedDiagnostics output");
   return {

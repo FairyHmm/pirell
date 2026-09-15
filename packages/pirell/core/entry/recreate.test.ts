@@ -2,7 +2,7 @@ import { describe, it, expect, expectTypeOf } from "vitest";
 // Import ONLY from the public entry — the point is that a user can
 // recreate the library (define their own composable ops and assemble a
 // surface) using nothing but the exported API.
-import type { Op, BoundWith, Extended, OpMap, ShapeOf } from "../index.js";
+import type { Op, BoundWith, Extended, ShapeOf } from "../index.js";
 import {
   extend,
   pirell,

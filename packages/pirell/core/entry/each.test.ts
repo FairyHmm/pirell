@@ -8,7 +8,7 @@ import type { Op } from "../types/base.js";
 // A sibling Keyed → Indexed op, mirroring a package's `values`: claims
 // open-keyed input so it re-wires onto `each`'s output shape.
 const listValues: Op<["k", "..."], ["i", "..."]> = (data) =>
-  Object.values(data as Record<string, unknown>);
+  Object.values(data);
 
 describe("each", () => {
   it("broadcasts an op across every record value", () => {

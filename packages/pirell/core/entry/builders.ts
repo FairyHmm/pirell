@@ -50,7 +50,6 @@ type SurfaceSpec = {
 // bootstraps a bare surface directly).
 function buildSurface(ops: OpMap, spec: SurfaceSpec): any {
   const target: any = spec.invoke;
-  let proxy: any;
   const handler: ProxyHandler<any> = {
     get(t, prop, receiver) {
       if (prop === SURFACE) return true;
@@ -72,7 +71,7 @@ function buildSurface(ops: OpMap, spec: SurfaceSpec): any {
       return spec.invoke(args[0]);
     },
   };
-  proxy = new Proxy(target, handler);
+  const proxy = new Proxy(target, handler);
   return proxy;
 }
 

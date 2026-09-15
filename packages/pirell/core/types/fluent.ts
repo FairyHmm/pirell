@@ -36,14 +36,14 @@ export type ShapeMismatch<In extends Shape, Actual extends Shape> = {
 // are recovered from the op's plain data types — `unknown[]` /
 // `Record<string, unknown>` are exact markers. Closed aliased claims
 // stay unsupported.
-type ClaimOf<D extends unknown> = D extends unknown[]
+type ClaimOf<D> = D extends unknown[]
   ? ["i", "..."]
   : D extends Record<string, unknown>
     ? ["k", "..."]
     : never;
 
 // `unknown` marks a terminal raw result; everything else reopens its column.
-type OutOf<RD extends unknown> = [unknown] extends [RD]
+type OutOf<RD> = [unknown] extends [RD]
   ? []
   : RD extends unknown[]
     ? ["i", "..."]

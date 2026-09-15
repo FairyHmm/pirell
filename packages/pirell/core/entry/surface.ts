@@ -7,7 +7,8 @@ export const SURFACE = "__pirell";
 
 /** Answers whether a value is a pirell surface. */
 export const isSurface = (x: unknown): x is Record<PropertyKey, unknown> =>
-  x != null &&
+  x !== null &&
+  x !== undefined &&
   (typeof x === "function" || typeof x === "object") &&
   SURFACE in (x as Record<PropertyKey, unknown>);
 
@@ -24,6 +25,7 @@ export type Registration = { readonly [REGISTER]: true; ops: OpMap };
 
 /** Answers whether an op's result is a registration, not data. */
 export const isRegistration = (x: unknown): x is Registration =>
-  x != null &&
+  x !== null &&
+  x !== undefined &&
   typeof x === "object" &&
   REGISTER in (x as Record<PropertyKey, unknown>);

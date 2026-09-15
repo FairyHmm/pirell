@@ -1,7 +1,6 @@
 import { describe, expectTypeOf, it } from "vitest";
 import type { CheckShape } from "./match-shape.js";
-import type { ShapeOf, DataOf } from "./codec.js";
-import type { Shape } from "./base.js";
+import type { ShapeOf } from "./codec.js";
 
 // Named-field shapes for testing both acceptance and rejection.
 type UserShape = ["k...", { name: string; age: number }];

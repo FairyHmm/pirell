@@ -36,12 +36,12 @@ const CASES: Case[] = [
   {
     name: "arr-direct",
     headline: true,
-    run: () => double([...SMALL_ARR] as unknown as number[]),
+    run: () => double([...SMALL_ARR]),
   },
   {
     name: "arr-pipe",
     headline: true,
-    run: () => pipe([...SMALL_ARR] as unknown as number[], double),
+    run: () => pipe([...SMALL_ARR], double),
   },
   {
     name: "arr-wrap",
@@ -54,12 +54,12 @@ const CASES: Case[] = [
   {
     name: "chain2-direct",
     headline: false,
-    run: () => sumAll(double([...SMALL_ARR] as unknown as number[])),
+    run: () => sumAll(double([...SMALL_ARR])),
   },
   {
     name: "chain2-pipe",
     headline: false,
-    run: () => pipe([...SMALL_ARR] as unknown as number[], double, sumAll),
+    run: () => pipe([...SMALL_ARR], double, sumAll),
   },
   {
     name: "chain2-wrap",
