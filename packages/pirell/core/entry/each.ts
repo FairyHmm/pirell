@@ -1,9 +1,7 @@
 import { isSurface, valueOf } from "./surface.js";
 import type { Op, Shape } from "../types/base.js";
 
-/**
- * Shape claim for keyed (record) data: any `["k", ...]` node
- */
+/** Shape claim for keyed (record) data. */
 export type Keyed = ["k", "..."];
 
 /**
@@ -11,23 +9,17 @@ export type Keyed = ["k", "..."];
  * the record from the results. Keyed in, keyed out.
  *
  * ```ts
- * import { pirell, sort } from "@pirell/group";
- * import { each, pipe } from "@pirell/core";
+ * import type { Op } from "@pirell/core";
  *
- * // fluent: wired at every surface
- * pirell({ a: [3, 1], b: [2] }).each(sort()).value; // { a: [1, 3], b: [2] }
- *
- * // functional: any bare stage
- * pipe({ a: [3, 1], b: [2] }, each(sort()));
- *
- * // standalone: the returned op itself
- * const sortEach = each(sort());
- * sortEach({ a: [3, 1], b: [2] });
+ * const double: Op<[["i", number]], [["i", number]]> = (ns) =>
+ *   ns.map((n) => n * 2);
+ * const doubleEach = each(double);
+ * doubleEach({ a: [1, 2], b: [3] }); // { a: [2, 4], b: [6] }
  * ```
  *
- * @param op The per-value operation. A `pirell()`-built surface is
- * invoked with each value and unwrapped via `valueOf`; a plain
- * function's return is used as-is.
+ * @param op Per-value operation. A `pirell()` surface is invoked with
+ * each value and unwrapped via {@linkcode valueOf}; a plain function's
+ * return is used as-is.
  */
 export const each =
   (op: (data: any) => any): Op<Keyed, Keyed> =>

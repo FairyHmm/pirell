@@ -3,16 +3,10 @@ import type { Registration } from "./surface.js";
 import { REGISTER, isSurface, valueOf } from "./surface.js";
 import { buildBound, buildDeferred } from "./builders.js";
 
-// The op body behind every surface's `.extend()` method (wired into
-// coreOps in index.ts) and this module's standalone free function
-// alike — one definition, so exactly one place knows what "extend"
-// does. Its result grows the surface's method table instead of
-// producing data (invisible to Op<In,Out>'s Shape-typed Out, PLAN.md
-// item 1). The `REGISTER` tag the op carries (a deferred surface can't
-// invoke on real data to check the result, so buildDeferred checks the
-// op itself, without invoking) makes the grown table apply immediately
-// rather than deferring extend as a step; the type-level counterpart
-// of that tag is `markChain`.
+// The op body behind every `.extend()` method and this module's free
+// function — one definition of what "extend" does. Carries the REGISTER
+// tag (paired with the `chain` brand) so buildDeferred applies the
+// grown table without invoking it.
 export const extendOp = Object.assign(
   (ops: OpMap): ((_data: unknown) => Registration) =>
     (_data: unknown) => ({ [REGISTER]: true, ops }),
@@ -20,26 +14,21 @@ export const extendOp = Object.assign(
 ) as (ops: OpMap) => (_data: unknown) => Registration;
 
 /**
- * Wires new ops onto a surface. Accepts anything registrable: a data
- * op, or a factory yielding one once applied.
+ * Wires new ops onto a surface. Accepts a data op, or a factory
+ * yielding one once applied.
  *
  * ```ts
  * import { pirell } from "@pirell/core";
+ * import type { Op } from "@pirell/core";
  *
- * const double = () => (ns: number[]) => ns.map((n) => n * 2);
+ * const double = (): Op<[["i", number]], [["i", number]]> => (ns) =>
+ *   ns.map((n) => n * 2);
  * const $ = pirell().extend({ double });
  * $([1, 2]).double().value; // [2, 4]
  * ```
  *
- * The surface param is typed `surface: S` (the bare surface, not
- * `Assembled<S>`) so inference runs on plain positions, not the
- * conditional returns. The result is
- * {@linkcode ExtendResult} — the same type `surface.extend(ops)`
- * itself returns.
- *
- * Published compositions annotate the result `Extended<typeof ops>`
- * (see `Extended`); shape checking fires at each op call, not at
- * registration.
+ * Result types come from {@linkcode ExtendResult} — annotate composed
+ * surfaces as `Extended<typeof ops>`.
  */
 export function extend<S, Ops extends OpMap>(
   surface: S,
@@ -48,9 +37,9 @@ export function extend<S, Ops extends OpMap>(
 export function extend<Ops extends OpMap>(
   ops: Ops,
 ): <S>(surface: S) => ExtendResult<S, Ops>;
-// Data op only: a factory applied here would take the data as its key
-// argument and hand back a function, so reject function-typed results
-// at the type level (and re-check at runtime for untyped callers).
+// Data-op form only: a factory here would take the data as its argument
+// and return a function. Reject function-typed results at the type level
+// (re-checked at runtime for untyped callers).
 export function extend<F extends (data: any) => unknown>(
   fn: F & (ReturnType<F> extends (...args: any[]) => any ? never : unknown),
 ): (x: any) => ReturnType<F>;
@@ -59,8 +48,8 @@ export function extend(surfaceOrOps: any, ops?: any): any {
     return applyExtend(surfaceOrOps, ops);
   }
   if (typeof surfaceOrOps === "function") {
-    // Unwrap surfaces to raw value first (both typeof checks matter:
-    // surfaces are callable fns); then run the op on the raw data.
+    // Surfaces are callable functions too — unwrap raw values first,
+    // then run the op on them.
     return (surfaceOrValue: any) => {
       const raw = valueOf(surfaceOrValue);
       const out = surfaceOrOps(raw);
@@ -81,12 +70,9 @@ function applyExtend(surface: any, ops: OpMap): any {
       "extend(surface, ops): surface has no .extend() method — pass an assembled pirell() surface.",
     );
   }
-  // The first bare surface (pirellRaw(), ops: {}) has no `.extend`
-  // method — nothing has seeded one, by design (builders.ts: no name
-  // is privileged there). This bootstrap grows its table directly via
-  // buildBound/buildDeferred; everything else uses its real method,
-  // going through the ordinary Registration/applyOp path like any
-  // other op.
+  // A bare surface (ops: {}) has no `.extend` method yet — bootstrap
+  // its table directly; everything else uses its real method, going
+  // through the ordinary Registration/applyOp path.
   if (typeof surface.extend !== "function") {
     return surface.value === undefined
       ? buildDeferred([], ops)

@@ -13,11 +13,6 @@
  * at each call; mismatches fail to compile. Callers type values, the
  * library owns shapes.
  *
- * The surface machinery lives in `entry/pirell.ts` (`pirellRaw`, bare,
- * no ops); this module defines "core ops" and builds `pirell` as
- * `extend(pirellRaw(), coreOps)` — the same public pieces any package
- * (like `@pirell/group`) composes its own surface from.
- *
  * @module
  */
 export * from "./types/public.js";
@@ -34,13 +29,8 @@ import { each } from "./entry/each.js";
 import { extend, extendOp } from "./entry/extend.js";
 import type { Extended } from "./types/assembled.js";
 
-// coreOps states everything pirell() actually offers, extend included —
-// nothing is seeded onto a surface for free (builders.ts: bare pirellRaw
-// has zero methods). extendOp is the exact op body a surface's own
-// `.extend()` dispatches to; including it here is what makes it exist,
-// like any package adding it to its own map. pipe/compose are marked
-// chains — var-args-fn ops that re-bind the surface (markChain, the
-// type-level counterpart of extendOp's REGISTER tag).
+// Everything `pirell` offers, seeded via extend like any package's own
+// map — pipe/compose are marked chains ({@linkcode markChain}).
 export const coreOps = {
   pipe: markChain(compose),
   compose: markChain(compose),
@@ -58,9 +48,12 @@ export type CoreOps = typeof coreOps;
  *
  * ```ts
  * import { pirell } from "@pirell/core";
+ * import type { Op } from "@pirell/core";
  *
+ * const double: Op<[["i", number]], [["i", number]]> = (ns) =>
+ *   ns.map((n) => n * 2);
  * pirell([1, 2]).value; // [1, 2]
- * pirell().each(Math.round); // deferred
+ * pirell().extend({ double }); // deferred: wire ops, bind data later
  * ```
  */
 export const pirell: Extended<CoreOps> = extend(pirellRaw(), coreOps);

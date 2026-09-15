@@ -1,5 +1,4 @@
-// Calling-convention converters (curried ↔ flat). Shape-agnostic: they
-// flip the convention from the input's own structure, nothing else.
+// Calling-convention converters (curried ↔ flat). Shape-agnostic.
 
 /**
  * Converts flat `(data, ...args) => result` to curried
@@ -14,8 +13,9 @@ export function makeCurry<A extends unknown[], D, R>(
       fn(data, ...args);
 }
 
-// Type-level curried → flat. A data param closed over outer generics does
-// not round-trip — the entry claim lives at compose.ts, not here.
+// Curried → flat at the type level (a data param closed over outer
+// generics can't round-trip; the entry claim is authored at the call
+// site, not here).
 type Flatten<F> = F extends (...args: infer A) => (data: infer Data) => infer R
   ? (data: Data, ...args: A) => R
   : never;

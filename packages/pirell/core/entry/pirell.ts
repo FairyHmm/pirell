@@ -1,5 +1,4 @@
-// Surface machinery: builds a bare surface (`ops: {}`); coreOps lives
-// in index.ts, which imports this and wires the ops in via `extend`.
+// Bare surface (ops: {}); coreOps wiring lives in index.ts.
 
 import { buildDeferred, buildBound } from "./builders.js";
 import type { ShapeOf } from "../types/codec.js";
@@ -16,10 +15,7 @@ import type { Deferred } from "../types/base.js";
  * ```
  */
 export function pirell<T>(data: T): BoundWith<{}, ShapeOf<T>>;
-/**
- * Builds a deferred surface: no data yet, ops register for later.
- * Calling it with data binds and runs everything registered.
- */
+/** Builds a deferred surface: no data yet, ops register for later. Calling it with data binds and runs everything registered. */
 export function pirell(): Deferred<[]>;
 export function pirell(...args: [unknown] | []): unknown {
   if (args.length === 0) {

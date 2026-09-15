@@ -25,13 +25,11 @@ export type DataOf<S extends Shape> = S extends []
       ? DataOfElem<Head, Rest>
       : unknown;
 
-// Dim→container mapping, stated once. Indexed only by narrowed Dim
-// (TS can't see through a deferred lookup).
+// Dim→container mapping, stated once (indexed only by narrowed Dim —
+// TS can't see through a deferred lookup).
 type Container<D extends Dim, V> = { i: V[]; k: Record<string, V> }[D];
 
-// Bare mixed tags carry no payload — fixed result per tag, read off a
-// table (result position needs no constraint, so the generic lookup is
-// fine here).
+// Bare mixed tags carry no payload — fixed result per tag.
 type MixedBare<T extends MixedTag> = {
   "i...": unknown[];
   "k...": Record<string, unknown>;
@@ -51,9 +49,7 @@ type DataOfElem<E extends Elem, Rest extends Shape> = E extends Dim
 
 // --- Type → Shape ---
 
-// Derives a Shape from a bare literal so calls need no `as Raw<S>` cast.
-// Used by chain.ts where no declared Op exists (bare-thunk/plain-fn link
-// outputs).
+// Shape from a bare literal, where no declared Op exists to read from.
 
 // True iff T is a genuine union (naked-T distributive trick).
 export type IsUnion<T, U = T> = T extends U
@@ -71,9 +67,8 @@ export type ShapeOf<D> = ShapeOfElem<D> extends infer R extends Shape
   ? R
   : never;
 
-// Concrete enough to encode as a Branch: not unknown/any, not a union
-// (those go mixed), not a container (those recurse). Lets `[1,2,3]`
-// derive [["i", number]] so a Branch-claiming op accepts a bare literal.
+// Not unknown/any, not a union (those go mixed), not a container
+// (those recurse).
 type IsConcreteLeaf<E> = [unknown] extends [E]
   ? false
   : IsUnion<E> extends true
@@ -84,23 +79,16 @@ type IsConcreteLeaf<E> = [unknown] extends [E]
         ? false
         : true;
 
-// The brand-recovery detour (checking D for ShapeBrand and returning a
-// prior Raw<S>'s S verbatim) was removed: pirell(data)'s only real call
-// site never receives a genuinely branded value (Bound<S>.value is typed
-// unknown, not Raw<S>), and structural re-derivation already recovers
-// the correct shape for every case tried, including mixed-tag and nested
-// containers (see types.test.ts) — ~5/site cheaper with no behavior
-// change (verified: 108/108 tests, obj-wrap 71→66, obj-pirell 35→30).
+// No branded-value special case: `Bound<S>.value` is unknown, and
+// structural re-derivation recovers the shape for every tried case.
 type ShapeOfElem<D> = D extends readonly (infer E)[]
   ? IsUnion<E> extends true
     ? ["i..."]
     : IsConcreteLeaf<E> extends true
       ? [["i", E]]
       : ["i", ...ContainerTail<E>]
-  // Uniform-first: concrete-leaf before union, so the common case
-  // skips IsUnion entirely.
-  // Fixed heterogeneous leaf rows are tables, not mixed: per-key detail
-  // matches bare claims via the welcome rule, so no matcher change.
+  // Concrete-leaf before union: the common case skips IsUnion.
+  // Fixed heterogeneous leaf rows are tables, not mixed.
   : D extends object
     ? IsConcreteLeaf<D[keyof D]> extends true
       ? [["k", D[keyof D]]]

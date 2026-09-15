@@ -1,21 +1,13 @@
 import type { ComposeChain, ComposeResult, FirstData } from "../types/chain.js";
 import { makeFlat } from "../ops/ops.js";
 
-/**
- * A chain op: var-args functions that re-bind the surface they ran on.
- * The type-level counterpart of the `REGISTER` tag extend's op carries
- * (entry/surface.ts) — the brand `Fluent` routes to the chain method;
- * no op name is consulted. Brand your own var-args-fn ops with
- * {@linkcode markChain}.
- */
+/** Brand marking a var-args-fn op as a chain. Type-level counterpart of the `REGISTER` tag; `Fluent` routes on it. */
 export type chain = { readonly __pirellChain: true };
 
 /**
- * Marks a var-args-fn op as a chain (re-binds the surface it ran on, so
- * its method threads the surface through the fns and re-wires siblings).
- * A type-only brand: the value is returned unchanged. Used at map
- * construction — `coreOps` marks pipe/compose; publishers replicate it
- * for their own chains.
+ * Brands a var-args-fn op as a chain: its method threads the surface
+ * through the functions and re-wires siblings. Type-only brand — the
+ * value is returned unchanged.
  */
 export const markChain = <F extends (...fns: any[]) => any>(fn: F): F & chain =>
   fn as F & chain;
@@ -26,11 +18,15 @@ export const markChain = <F extends (...fns: any[]) => any>(fn: F): F & chain =>
  *
  * ```ts
  * import { compose } from "@pirell/core";
+ * import type { Op } from "@pirell/core";
  *
- * const run = compose(
- *   (ns: number[]) => ns.map((n) => n * 2),
- *   (ns: number[]) => ns.filter((n) => n > 2),
- * );
+ * type NumberTransform = Op<[["i", number]], [["i", number]]>;
+ * const double: NumberTransform = (ns) =>
+ *   ns.map((n) => n * 2);
+ * const keep: NumberTransform = (ns) =>
+ *   ns.filter((n) => n > 2);
+ *
+ * const run = compose(double, keep);
  * run([1, 2]); // [4]
  * ```
  */
@@ -38,18 +34,16 @@ export function compose<Fns extends unknown[]>(
   ...fns: Fns & ComposeChain<Fns>
 ): (data: FirstData<Fns>) => ComposeResult<Fns>;
 export function compose(...fns: Array<(x: any) => any>): (x: any) => any {
-  // A zero-arg thunk link is applied once to reach its (data) => R
-  // stage; a data fn (op or pre-applied factory product) already is
-  // that stage.
+  // Zero-arg thunk links are applied once to reach their (data) => R
+  // stage; data fns already are that stage.
   const stages = fns.map((fn) => (fn.length === 0 ? (fn as () => any)() : fn));
   return (x: any) =>
     stages.reduce((acc, fn, i) => {
       try {
         return fn(acc);
       } catch (err) {
-        // Spread-array chains skip compile-time shape checks (length:
-        // number isn't indexable per-link), so a stage error is thrown
-        // with context instead of surfacing raw.
+        // Spread-array chains skip compile-time checks; tag the stage
+        // error with context instead of surfacing it raw.
         const label =
           err instanceof Error ? `${err.name}: ${err.message}` : String(err);
         throw new Error(
@@ -64,8 +58,9 @@ export function compose(...fns: Array<(x: any) => any>): (x: any) => any {
     }, x);
 }
 
-// Data-first view of compose. The entry claim is authored here, not in
-// shape-agnostic makeFlat — same Chain/Result types, flipped argument order.
+// Data-first view of {@linkcode compose}: same Chain/Result types,
+// flipped argument order. The entry claim is authored here, not in
+// shape-agnostic makeFlat.
 type PipeFn = <Fns extends unknown[]>(
   data: FirstData<Fns>,
   ...fns: Fns & ComposeChain<Fns>
@@ -77,11 +72,11 @@ type PipeFn = <Fns extends unknown[]>(
  *
  * ```ts
  * import { pipe } from "@pirell/core";
+ * import type { Op } from "@pirell/core";
  *
- * pipe(
- *   [1, 2],
- *   (ns: number[]) => ns.map((n) => n * 2),
- * ); // [2, 4]
+ * const double: Op<[["i", number]], [["i", number]]> = (ns) =>
+ *   ns.map((n) => n * 2);
+ * pipe([1, 2], double); // [2, 4]
  * ```
  */
 export const pipe: PipeFn = makeFlat(compose) as unknown as PipeFn;

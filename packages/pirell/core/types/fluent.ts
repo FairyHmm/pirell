@@ -1,19 +1,11 @@
-// Fluent<F,S,Ops>: a wired method. Check fires at the call; Ops re-wire
-// onto Bound<Out> (unfit siblings uncallable, not vanished); failure arm
-// sits outside the arrow so the call itself is uncallable (TS2349).
-//
-// Two tagged families dispatch before the fixed-arity data-op path,
-// mirroring the tags builders.ts already applies at runtime — no op
-// name is ever mentioned:
-//  - an op whose call yields a Registration grows the surface's method
-//    table, so its method is a generic ops-map call (extend). The gate
-//    is the Registration result, the same marker runOp checks.
-//  - an op carrying the chain brand (a marked var-args-fn op like
-//    `pipe: markChain(compose)` in an ops map) threads the surface
-//    through its functions and re-binds: what makeFlat turned data-first
-//    at runtime. The gate is that brand, the type-level counterpart of
-//    the REGISTER tag; publishers brand their own var-args-fn ops to get
-//    the same chain method.
+// Fluent<F,S,Ops>: a wired method. Dispatch is structural, never by op
+// name — two tagged families first, then shape claims:
+//  - a call yielding a Registration (extend's op body) → generic
+//    ops-map call
+//  - an op carrying the chain brand (markChain) → chain method
+// Check fires at the call; Ops re-wire onto Bound<Out> (unfit siblings
+// uncallable, not vanished); the failure arm sits outside the arrow so
+// the call itself is uncallable (TS2349).
 
 import type { Bound, Op, OpLike, Shape } from "./base.js";
 import type { MatchShape } from "./match-shape.js";
@@ -36,20 +28,18 @@ export type ShapeMismatch<In extends Shape, Actual extends Shape> = {
   actual: Actual;
 };
 
-// Aliased Op factories (e.g. a group's `Rewrap = Op<["i","..."], ...>`)
-// can't re-match `Op<infer FIn, infer FOut>`: the infer pulls the shape
-// out of DataOf, already flattened, so an open claim degrades to a putty
-// union. DataOf is recoverable from the op's plain parameter though, and
-// the open-column data types are exact markers (unknown[] is indexed, a
-// record keyed). Closed aliased claims stay unsupported — write directly.
+// Aliased Op factories can't re-match `Op<infer FIn, infer FOut>`
+// (the infer pulls a shape already flattened out of DataOf), so claims
+// are recovered from the op's plain data types — `unknown[]` /
+// `Record<string, unknown>` are exact markers. Closed aliased claims
+// stay unsupported.
 type ClaimOf<D extends unknown> = D extends unknown[]
   ? ["i", "..."]
   : D extends Record<string, unknown>
     ? ["k", "..."]
     : never;
 
-// `Raw<[]>` is unknown, so a terminal raw result is `unknown` — its
-// exact data marker. Everything else reopens the result column.
+// `unknown` marks a terminal raw result; everything else reopens its column.
 type OutOf<RD extends unknown> = [unknown] extends [RD]
   ? []
   : RD extends unknown[]
@@ -66,21 +56,16 @@ type OutOf<RD extends unknown> = [unknown] extends [RD]
  * itself is uncallable (TS2349).
  */
 export type Fluent<F extends OpLike, S, Ops extends OpMap = {}> =
-  // Registering op (extend): yields a Registration when called. The
-  // method grows the existing table — merge semantics, the same
-  // `{ ...ops, ...result.ops }` builders.ts applies at runtime — so
-  // full-map (`pirellRaw().extend(wholeMap)` via `Extended`) and
-  // chained partial extends agree with what actually runs.
+  // Registering op (extend): grows the existing table — merge
+  // `{ ...ops, ...result.ops }`, same semantics as runtime.
   F extends (ops: infer _O extends OpMap) => (data: any) => Registration
     ? <O2 extends OpMap>(ops: O2) => ExtendResult<S, O2 & Ops>
     : F extends chain
       ? ChainMethod<S, Ops>
       : F extends (...args: infer A) => infer R
         ? R extends (data: any) => any
-          ? // Ordinary factory (fixed or loose-arity — assign/push/splice/
-            // reduce among groups): apply the args, get a data fn/op, then
-            // match its claim against the surface's shape. Only branded
-            // chains thread the surface itself.
+          ? // Ordinary factory: apply the args, then match its claim
+            // against the surface's shape.
             FactoryPath<F, A, R, S, Ops>
           : DirectOpPath<F, S, Ops>
         : never;
@@ -116,8 +101,6 @@ type DirectOpPath<F, S, Ops extends OpMap> =
           : ShapeMismatch<ClaimOf<D2>, CurrentShp<S>>
       : never;
 
-// One shared definition instead of six inline copies at the surface
-// return sites — each copy was an independently solved instantiation.
 // Interfaces can't extend a mapped type (TS2312), so this stays an alias.
 /**
  * A surface's ops as callable methods, each wired by {@linkcode Fluent}.

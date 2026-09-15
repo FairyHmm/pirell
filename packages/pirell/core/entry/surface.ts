@@ -1,6 +1,5 @@
-// Single definition of surface identity + unwrap. assemble.ts and
-// extend.ts must agree here, or user-facing and internal handling of
-// extend(fn)(pirell(data)) diverge.
+// Single definition of surface identity + unwrap; builders and extend
+// agree here.
 import type { OpMap } from "../types/assembled.js";
 
 /** Marker property identifying a pirell surface. */
@@ -16,10 +15,8 @@ export const isSurface = (x: unknown): boolean =>
 export const valueOf = (x: unknown): unknown =>
   isSurface(x) ? (x as any).value : x;
 
-// extend's result grows the method table rather than producing data —
-// invisible to Op<In,Out>'s Shape-typed Out (PLAN.md item 1). runOp
-// detects it structurally, the same way it already detects factory
-// results, so extend needs no name-based hatch in buildSurface.
+// Marks an op result that grows the method table rather than producing
+// data; runOp/applyOp branch on it structurally (no name-based hatch).
 /** Marker property identifying an extend-style registration result. */
 export const REGISTER = Symbol("pirellRegister");
 

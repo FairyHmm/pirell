@@ -4,8 +4,7 @@ import type { DataOf } from "./codec.js";
 // --- Shape gate for compose/pipe ---
 
 // A zero-arg fn returning a fn is a curried Op-shaped link, matched by
-// call shape alone — no nominal Op brand. Mirrors compose's own runtime
-// check (`fn.length === 0 ? fn() : fn`).
+// call shape alone (mirrors compose's runtime `fn.length === 0` check).
 type IsThunk<F> = F extends () => (data: any) => any ? true : false;
 
 // Non-tuple arrays (length number) can't recurse tuple-style — map instead.
@@ -13,12 +12,9 @@ type IsTuple<Fns extends readonly unknown[]> = number extends Fns["length"]
   ? false
   : true;
 
-// Both ends read off one ComposeChain walk (first In feeds input,
-// last Out feeds result). extends-Shape guards keep the degenerate
-// empty chain from leaking unknown through a vacuous-never match.
-// Single-link chains get their own arm: [F, ...M, L] needs two fixed
-// positions, so a 1-tuple never matches it (pre-existing gap — single
-// pipes used to resolve never).
+// Both ends read off one ComposeChain walk (first In feeds input, last
+// Out feeds result). extends-Shape guards block the vacuous-never
+// empty-chain leak.
 type ChainResult<F> =
   IsThunk<F> extends true
     ? F extends Op<any, infer LOut extends Shape>
@@ -39,8 +35,8 @@ type ChainEnds<Fns extends readonly unknown[]> =
       ? [ChainEntry<First>, ChainResult<Last>]
       : never;
 
-// Concrete entry-data type from the first link's own annotation (no
-// DataOf re-derivation). Give-ups stay identical to ComposeChain's.
+// First link's own data param, no DataOf re-derivation. Give-ups match
+// ComposeChain's.
 export type FirstData<Fns extends readonly unknown[]> =
   Fns extends [infer F, ...unknown[]]
     ? IsThunk<F> extends true
@@ -56,10 +52,9 @@ export type FirstData<Fns extends readonly unknown[]> =
       ? never
       : unknown;
 
-// Mismatch is a shape ({ok: false}), not a bare never a tuple pattern
-// would match vacuously. Declared ops check against their own annotation's
-// param/return (already elaborated, cached) instead of decomposing Op and
-// rebuilding DataOf/Raw per link — same check, no reconstruction.
+// Mismatch is a `{ok: false}` shape, not a bare never (tuple patterns
+// match never vacuously). Declared ops check their own annotation's
+// param/return — no Op decomposition or DataOf/Raw rebuild per link.
 type Step<F, Cur> =
   IsThunk<F> extends true
     ? F extends (...args: any[]) => (data: infer D0) => infer R0
@@ -71,9 +66,9 @@ type Step<F, Cur> =
       ? { ok: true; r: R; l: F }
       : { ok: false };
 
-// Concretely typed links for assemble.ts's .pipe()/.compose(). Threads
-// the raw value only — no proven-shape channel. Spreads keep each link's
-// own signature (length unknown, so threading is impossible: unchecked).
+// Threads the raw value only — no proven-shape channel. Non-tuple
+// arrays keep each link's own signature (threading impossible:
+// unchecked, so compose's runtime error gains context).
 export type Tail<Fns extends readonly unknown[], Cur> =
   IsTuple<Fns> extends true
     ? Fns extends [infer F, ...infer Rest]
@@ -91,9 +86,9 @@ export type Tail<Fns extends readonly unknown[], Cur> =
       ? Array<F>
       : never;
 
-// First link keeps its double-curried Op type (passed un-invoked); later
-// links are threaded — different positions, not duplication. Links keep
-// their own declared types (no Op/Raw reconstruction — see Step).
+// First link stays double-curried (passed un-invoked, declared Op type
+// intact); later links are threaded. Links keep their own declared
+// types — no Op/Raw reconstruction (see Step).
 export type ComposeChain<Fns extends readonly unknown[]> =
   IsTuple<Fns> extends true
     ? Fns extends [infer F, ...infer Rest]

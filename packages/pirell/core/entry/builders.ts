@@ -9,14 +9,12 @@ import type { Bound, Deferred, OpLike } from "../types/base.js";
 import type { Assembled, OpMap } from "../types/assembled.js";
 
 // Runtime surface builders (surface types live in types/assembled.ts).
-// One shared assembly sequence; the two surface kinds differ only in
-// what each step means (eager vs lazy).
+// One shared assembly sequence; Bound and Deferred differ only in what
+// each step means (eager vs lazy).
 
-// Ops are data fns; factories are applied to args first. A zero-arg call
-// is ambiguous (data op vs all-optional-arg factory); the result resolves
-// it — a factory, fed the data, yields the data-stage function. A
-// Registration (extend's op body) is returned as-is; applyOp branches on
-// it structurally, same category of check as the factory-result inspection.
+// Zero-arg calls are ambiguous (data op vs all-optional-arg factory);
+// the result resolves it. A Registration is returned as-is so applyOp
+// can branch on it structurally.
 const runOp = (op: OpLike, args: any[], data: unknown): unknown => {
   if (args.length === 0) {
     const direct = (op as (data: unknown) => unknown)(data);
@@ -45,19 +43,11 @@ type SurfaceSpec = {
 
 // --- one universal loop ---
 
-// Proxy-based resolution: a Registration can add methods mid-chain, so
-// the method table isn't fixed at build time — a pre-listed descriptor
-// map can't express that. Verified faster and smaller than eager
-// Object.defineProperties at every table size (PLAN.md item 1).
-// Typo-safety moves entirely onto Fluent's compile-time coverage —
-// there is no runtime fallback for an unknown method name, by design.
-//
-// No name is privileged here — not even `extend`. A bare surface
-// (`ops: {}`) has NO methods, extend included; the free
-// `extend(surface, ops)` function (entry/extend.ts) is what grows it,
-// reaching into buildBound/buildDeferred directly rather than
-// requiring `.extend` to already exist. Every other surface gets
-// `.extend` the ordinary way: because its ops-map author put it there.
+// Proxy-based: a Registration can add methods mid-chain, so the table
+// isn't fixed at build time. Typo-safety lives entirely on Fluent's
+// compile-time coverage. No name is privileged — `ops: {}` yields zero
+// methods, `extend` included (the free `extend(surface, ops)` function
+// bootstraps a bare surface directly).
 function buildSurface(ops: OpMap, spec: SurfaceSpec): any {
   const target: any = spec.invoke;
   let proxy: any;
@@ -86,9 +76,7 @@ function buildSurface(ops: OpMap, spec: SurfaceSpec): any {
   return proxy;
 }
 
-// applyOp runs the op and, if the result is a Registration, spawns a
-// surface with the grown table instead of wrapping it as data — the
-// one place extend's structural marker is actually consumed.
+// A Registration result grows the table instead of wrapping as data.
 export function buildBound(value: unknown, ops: OpMap): Assembled<Bound<any>> {
   return buildSurface(ops, {
     invoke: (input) => buildBound(valueOf(input), ops),
@@ -115,13 +103,9 @@ export function buildDeferred(
         ops,
       ),
     getValue: () => undefined,
-    // Registration must grow this Deferred's table before data arrives
-    // (ops are known immediately), but a real op can't be speculatively
-    // run on fake data (zero-arg calls are ambiguous, and ops may have
-    // side effects). The op itself carries the REGISTER tag instead —
-    // checked without invoking anything — so extend (extendOp) resolves
-    // immediately and any future registering op gets the same for free;
-    // nothing here names `extend` specifically.
+    // A Registration must grow the table before data arrives; ops can't
+    // be speculatively run on fake data, so the REGISTER tag is checked
+    // on the op itself, without invoking it.
     applyOp: (op, args) => {
       const result =
         typeof op === "function" && REGISTER in (op as any)
