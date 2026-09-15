@@ -108,7 +108,7 @@ export function buildDeferred(
     // on the op itself, without invoking it.
     applyOp: (op, args) => {
       const result =
-        typeof op === "function" && REGISTER in (op as any)
+        typeof op === "function" && REGISTER in op
           ? runOp(op, args, undefined)
           : undefined;
       if (isRegistration(result)) {

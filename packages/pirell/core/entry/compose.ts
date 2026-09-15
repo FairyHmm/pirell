@@ -67,5 +67,14 @@ type PipeFn = <Fns extends unknown[]>(
  *   ns.map((n) => n * 2);
  * pipe([1, 2], double); // [2, 4]
  * ```
+ *
+ * Cast, not proven: `makeFlat`'s `Flatten<F>` pattern-matches a single
+ * `(...args) => (data) => R` signature, but `compose` is overloaded
+ * (a generic declared signature plus its implementation signature) —
+ * `Flatten` can't walk that, so the assignment isn't structurally
+ * checked either way. A single `as` here (not `as unknown as`, which
+ * implies the direct cast was rejected — it isn't) is the honest
+ * version of the same unchecked assertion; runtime correctness is
+ * covered by `compose.test.ts`'s `pipe` suite instead.
  */
-export const pipe: PipeFn = makeFlat(compose) as unknown as PipeFn;
+export const pipe: PipeFn = makeFlat(compose) as PipeFn;

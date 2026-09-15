@@ -6,14 +6,13 @@ import type { OpMap } from "../types/assembled.js";
 export const SURFACE = "__pirell";
 
 /** Answers whether a value is a pirell surface. */
-export const isSurface = (x: unknown): boolean =>
+export const isSurface = (x: unknown): x is Record<PropertyKey, unknown> =>
   x != null &&
   (typeof x === "function" || typeof x === "object") &&
-  SURFACE in (x as any);
+  SURFACE in (x as Record<PropertyKey, unknown>);
 
 /** Unwraps a surface to its raw value; passes anything else through. */
-export const valueOf = (x: unknown): unknown =>
-  isSurface(x) ? (x as any).value : x;
+export const valueOf = (x: unknown): unknown => (isSurface(x) ? x.value : x);
 
 // Marks an op result that grows the method table rather than producing
 // data; runOp/applyOp branch on it structurally (no name-based hatch).
@@ -25,4 +24,6 @@ export type Registration = { readonly [REGISTER]: true; ops: OpMap };
 
 /** Answers whether an op's result is a registration, not data. */
 export const isRegistration = (x: unknown): x is Registration =>
-  x != null && typeof x === "object" && REGISTER in (x as any);
+  x != null &&
+  typeof x === "object" &&
+  REGISTER in (x as Record<PropertyKey, unknown>);

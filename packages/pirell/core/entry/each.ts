@@ -31,4 +31,4 @@ export const each =
           ? valueOf((op as (d: unknown) => unknown)(value))
           : (op as (d: unknown) => unknown)(value),
       ]),
-    ) as any;
+    );
