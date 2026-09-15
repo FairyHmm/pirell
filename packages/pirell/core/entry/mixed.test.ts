@@ -7,7 +7,7 @@ import {
 } from "../ops/fixture-ops.js";
 
 describe("Keyed<unknown, 'mixed'> (non-uniform keyed nodes)", () => {
-  it("Wrapper: accepts an object with non-uniform values via a mixed-keyed op", () => {
+  it("bound: accepts an object with non-uniform values via a mixed-keyed op", () => {
     const data = { name: "alice", age: 30, active: true };
     const result = (pirell(data) as any)
       .extend({ stringifyValues })

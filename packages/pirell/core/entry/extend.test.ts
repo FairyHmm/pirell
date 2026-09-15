@@ -11,8 +11,9 @@ describe("standalone extend()", () => {
     expect(result.value).toEqual([2, 4, 6]);
   });
 
-  it("works on a data-bound Wrapper too", () => {
-    // extend(ops) accepts either Deferred or Wrapper — same wiring mechanism
+  it("works on a data-bound surface too", () => {
+    // extend(ops) accepts either a deferred or a data-bound surface —
+    // same wiring mechanism
     const result = (extend({ double })(pirell([1, 2, 3])) as any).double()
       .value;
     expect(result).toEqual([2, 4, 6]);

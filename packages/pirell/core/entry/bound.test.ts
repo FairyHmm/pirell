@@ -11,7 +11,7 @@ import {
   doubleOpen,
 } from "../ops/fixture-ops.js";
 
-describe("Wrapper.extend (data-bound)", () => {
+describe("bound-surface .extend()", () => {
   it("wires a fluent method and returns a surface holding the raw result", () => {
     const ext = pirell([1, 2, 3]).extend({ double });
     const result = ext.double();
@@ -63,7 +63,7 @@ describe("Wrapper.extend (data-bound)", () => {
   });
 });
 
-describe("Wrapper.extend always wires; the mismatch surfaces at the call, not registration", () => {
+describe("bound-surface .extend always wires; the mismatch surfaces at the call, not registration", () => {
   it(".extend() accepts a mismatched op without complaint", () => {
     // Compile-time only: must type-check clean, no @ts-expect-error.
     if (false) {
@@ -93,7 +93,7 @@ describe("Wrapper.extend always wires; the mismatch surfaces at the call, not re
 
 // See PLAN.md "relocate .extend()'s shape check onto Fluent/call-site"
 // for the overload-collision bug these tests guard against.
-describe("Wrapper.extend with multiple ops registered together", () => {
+describe("bound-surface .extend with multiple ops registered together", () => {
   it("calling the op that fits the CURRENT shape succeeds", () => {
     const data: [string, number][] = [
       ["a", 1],
@@ -146,7 +146,7 @@ describe("Wrapper.extend with multiple ops registered together", () => {
 // builders.ts runOp resolves a zero-arg fluent call by result: data ops
 // return it directly; factories fed the data yield the data stage (a
 // function), so they're re-called plain to apply to the data instead.
-describe("Wrapper.extend zero-arg resolution", () => {
+describe("bound-surface .extend zero-arg resolution", () => {
   it("applies an optional-arg factory as op()(data)", () => {
     const result = pirell([1, 2, 3]).extend({ take }).take();
 
@@ -166,7 +166,7 @@ describe("Wrapper.extend zero-arg resolution", () => {
   });
 });
 
-describe("Wrapper.pipe (data-bound)", () => {
+describe("bound-surface .pipe()", () => {
   it("applies functions and returns a surface", () => {
     const result = pirell([1, 2, 3]).pipe(double, sumAll).value;
     expect(result).toBe(12); // (1+2+3)*2
@@ -182,7 +182,7 @@ describe("Wrapper.pipe (data-bound)", () => {
   });
 });
 
-describe("Wrapper.compose (data-bound)", () => {
+describe("bound-surface .compose()", () => {
   it("applies functions and returns a surface", () => {
     const result = pirell([1, 2, 3]).compose(double, sumAll).value;
     expect(result).toBe(12);

@@ -88,13 +88,10 @@ export type Op<In extends Shape, Out extends Shape> = (
  * output is exactly what `runOp` applies.
  */
 export type OpLike =
-  | ((data: any) => any)
-  | ((...args: any[]) => (data: any) => any);
+  ((data: any) => any) | ((...args: any[]) => (data: any) => any);
 
 /**
  * Type-level tag for a data-bound surface: shape `S` proven from data.
- * Named `Bound` (not `Wrapper`) to avoid colliding with the runtime
- * class of the same concept.
  */
 export interface Bound<S extends Shape> {
   readonly __shape?: S;
