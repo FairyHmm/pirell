@@ -13,16 +13,15 @@
  * at each call; mismatches fail to compile. Callers type values, the
  * library owns shapes.
  *
- * The surface machinery lives in `entry/pirell.ts` (bare, no ops);
- * this module is where "core ops" is defined — `{ pipe, compose, each }`,
- * added to the bare surface via `pirell().extend(coreOps)`, the same
- * way `@pirell/group` adds its ops.
+ * The surface machinery lives in `entry/pirell.ts` (`pirellRaw`, bare,
+ * no ops); this module defines "core ops" and builds `pirell` as
+ * `extend(pirellRaw(), coreOps)` — the same public pieces any package
+ * (like `@pirell/group`) composes its own surface from.
  *
  * @module
  */
 export * from "./types/public.js";
-export { pipe, compose } from "./entry/compose.js";
-export { Wrapper, bindValue } from "./entry/pirell.js";
+export { pipe, compose, markChain } from "./entry/compose.js";
 export { extend } from "./entry/extend.js";
 export { buildBound, buildDeferred } from "./entry/builders.js";
 export { makeFlat, makeCurry } from "./ops/ops.js";
@@ -30,12 +29,24 @@ export { SURFACE, isSurface, valueOf } from "./entry/surface.js";
 export { each } from "./entry/each.js";
 
 import { pirell as pirellRaw } from "./entry/pirell.js";
-import { compose } from "./entry/compose.js";
+import { compose, markChain } from "./entry/compose.js";
 import { each } from "./entry/each.js";
-import type { Extended, OpMap, BoundWith } from "./types/assembled.js";
-import type { ShapeOf } from "./types/codec.js";
+import { extend, extendOp } from "./entry/extend.js";
+import type { Extended } from "./types/assembled.js";
 
-const coreOps: OpMap = { pipe: compose, compose, each };
+// coreOps states everything pirell() actually offers, extend included —
+// nothing is seeded onto a surface for free (builders.ts: bare pirellRaw
+// has zero methods). extendOp is the exact op body a surface's own
+// `.extend()` dispatches to; including it here is what makes it exist,
+// like any package adding it to its own map. pipe/compose are marked
+// chains — var-args-fn ops that re-bind the surface (markChain, the
+// type-level counterpart of markRegistering).
+export const coreOps = {
+  pipe: markChain(compose),
+  compose: markChain(compose),
+  each,
+  extend: extendOp,
+};
 
 /** The ops map behind {@linkcode pirell}, as a type for composition. */
 export type CoreOps = typeof coreOps;
@@ -52,10 +63,4 @@ export type CoreOps = typeof coreOps;
  * pirell().each(Math.round); // deferred
  * ```
  */
-export function pirell<T>(data: T): BoundWith<CoreOps, ShapeOf<T>>;
-export function pirell(): Extended<CoreOps>;
-export function pirell(...args: [unknown] | []): unknown {
-  return args.length === 0
-    ? pirellRaw().extend(coreOps)
-    : pirellRaw(args[0]).extend(coreOps);
-}
+export const pirell: Extended<CoreOps> = extend(pirellRaw(), coreOps);

@@ -3,7 +3,15 @@ import { describe, it, expect, expectTypeOf } from "vitest";
 // recreate the library (define their own composable ops and assemble a
 // surface) using nothing but the exported API.
 import type { Op, BoundWith, Extended, OpMap, ShapeOf } from "../index.js";
-import { extend, pirell, buildBound, buildDeferred, pipe, compose, each } from "../index.js";
+import {
+  extend,
+  pirell,
+  buildBound,
+  buildDeferred,
+  compose,
+  markChain,
+  each,
+} from "../index.js";
 
 // Bodies are factories returning data fns; the as-cast supplies the
 // Op<...> shapes on the product.
@@ -48,7 +56,7 @@ describe("recreating the library through the public API", () => {
     expect(total).toBe(3);
   });
 
-  it("standalone extend(ops)(surface) works on a data-bound Wrapper", () => {
+  it("standalone extend(ops)(surface) works on a data-bound surface", () => {
     const result = (
       extend({ sum })(pirell([{ amount: 4 }, { amount: 6 }])) as any
     ).sum("amount").value;
@@ -73,7 +81,10 @@ describe("recreating the library through the public API", () => {
 });
 
 describe("recreating pirell() itself from buildBound/buildDeferred", () => {
-  const myOps = { pipe: compose, compose, each };
+  // pipe/compose are marked as chains — var-args-fn ops that re-bind the
+  // surface; that's what makes `.pipe` a chain method here, exactly as
+  // core's own ops map does it.
+  const myOps = { pipe: markChain(compose), compose: markChain(compose), each };
 
   function myPirell<T>(data: T): BoundWith<typeof myOps, ShapeOf<T>>;
   function myPirell(): Extended<typeof myOps>;

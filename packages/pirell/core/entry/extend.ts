@@ -1,6 +1,22 @@
-import type { Op } from "../types/base.js";
 import type { ExtendResult, OpMap } from "../types/assembled.js";
-import { valueOf } from "./surface.js";
+import {
+  isSurface,
+  makeRegistration,
+  markRegistering,
+  valueOf,
+} from "./surface.js";
+import { growBareSurface } from "./builders.js";
+
+// The op body behind every surface's `.extend()` method (wired into
+// coreOps in index.ts) and this module's standalone free function
+// alike — one definition, so exactly one place knows what "extend"
+// does. Its result grows the surface's method table instead of
+// producing data (invisible to Op<In,Out>'s Shape-typed Out, PLAN.md
+// item 1); markRegistering tags it so buildDeferred grows its table
+// immediately (entry/builders.ts) instead of deferring it as a step.
+export const extendOp = markRegistering(
+  (ops: OpMap) => (_data: unknown) => makeRegistration(ops),
+);
 
 /**
  * Wires new ops onto a surface. Accepts anything registrable: a data
@@ -15,8 +31,8 @@ import { valueOf } from "./surface.js";
  * ```
  *
  * The surface param is typed `surface: S` (the bare surface, not
- * `Assembled<S>`) so inference runs on plain positions, not
- * `ISurface`'s conditional returns. The result is
+ * `Assembled<S>`) so inference runs on plain positions, not the
+ * conditional returns. The result is
  * {@linkcode ExtendResult} — the same type `surface.extend(ops)`
  * itself returns.
  *
@@ -59,10 +75,18 @@ export function extend(surfaceOrOps: any, ops?: any): any {
 }
 
 function applyExtend(surface: any, ops: OpMap): any {
-  if (typeof surface.extend !== "function") {
+  if (!isSurface(surface)) {
     throw new TypeError(
       "extend(surface, ops): surface has no .extend() method — pass an assembled pirell() surface.",
     );
+  }
+  // The first bare surface (pirellRaw(), ops: {}) has no `.extend`
+  // method — nothing has seeded one, by design (builders.ts: no name
+  // is privileged there). growBareSurface handles that bootstrap case;
+  // everything else uses its real method, going through the ordinary
+  // Registration/applyOp path like any other op.
+  if (typeof surface.extend !== "function") {
+    return growBareSurface(surface, ops);
   }
   return surface.extend(ops);
 }

@@ -1,8 +1,4 @@
-import type {
-  ComposeChain,
-  ComposeResult,
-  FirstData,
-} from "../types/chain.js";
+import type { ComposeChain, ComposeResult, FirstData } from "../types/chain.js";
 import { makeFlat } from "../ops/ops.js";
 
 // Untyped runtime shared by typed compose below and the surface builders.
@@ -33,6 +29,24 @@ export function composeRaw(...fns: Array<(x: any) => any>): (x: any) => any {
       }
     }, x);
 }
+
+/**
+ * A chain op: var-args functions that re-bind the surface they ran on.
+ * The type-level mirror of `markRegistering` (entry/surface.ts) — the
+ * brand `Fluent` routes to the chain method; no op name is consulted.
+ * Brand your own var-args-fn ops with {@linkcode markChain}.
+ */
+export type chain = { readonly __pirellChain: true };
+
+/**
+ * Marks a var-args-fn op as a chain (re-binds the surface it ran on, so
+ * its method threads the surface through the fns and re-wires siblings).
+ * A type-only brand: the value is returned unchanged. Used at map
+ * construction — `coreOps` marks pipe/compose; publishers replicate it
+ * for their own chains.
+ */
+export const markChain = <F extends (...fns: any[]) => any>(fn: F): F & chain =>
+  fn as F & chain;
 
 /**
  * Runs functions left to right, returning a reusable pipeline — data

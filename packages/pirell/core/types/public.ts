@@ -6,7 +6,6 @@ export type { Op, Bound, Deferred } from "./base.js";
 export type { ShapeOf } from "./codec.js";
 export type { OpMethods } from "./fluent.js";
 export type {
-  ISurface,
   Assembled,
   ResolvedOpsDeferred,
   Extended,

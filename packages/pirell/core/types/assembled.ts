@@ -31,11 +31,11 @@ export type CurrentShp<S> =
 
 /**
  * Collapses Shp/Ops before the nested call signature sees them:
- * threading still-open params through two generic layers cost 380K
- * insts + TS7056 (~54K once resolved here). `Omit` drops the bare
- * `Deferred` call signature, replacing it with one built from the
- * same formula as `BoundWith` — one definition of "bind T, wire Ops",
- * used at both the free-function overload and here.
+ * threading open params through two generic layers cost 380K insts +
+ * TS7056 (~54K once resolved here). `Omit` drops the bare `Deferred`
+ * call signature, replacing it with `BoundWith`'s formula — one
+ * definition of "bind T, wire Ops" for the free-function overload and
+ * here.
  */
 export type ResolvedOpsDeferred<
   Shp extends Shape,
@@ -52,12 +52,11 @@ export type ResolvedOpsDeferred<
 type ChainFns<S> = [(arg: CurrentData<S>) => any, ...Array<(arg: any) => any>];
 
 /**
- * What `surface.extend(ops)` returns, named once so publishers (and
- * our own packages) can annotate composed surfaces for JSR's
- * explicit-type rule instead of re-spelling the conditional.
- * `ISurface.extend` is defined as this alias — single source of
- * truth, no drift. Exported so `entry/extend.ts` can type its
- * surface-argument overload against the exact same formula.
+ * What `surface.extend(ops)` returns, named once so publishers can
+ * annotate composed surfaces for JSR's explicit-type rule instead of
+ * re-spelling the conditional. `Fluent` routes registering ops to
+ * this alias — single source of truth. Exported so `entry/extend.ts`
+ * types its surface-argument overload against the same formula.
  */
 export type ExtendResult<S, Ops extends OpMap> =
   S extends Deferred<any>
@@ -65,9 +64,9 @@ export type ExtendResult<S, Ops extends OpMap> =
       ? Assembled<
           S extends Deferred<infer Out extends Shape>
             ? ResolvedOpsDeferred<Out, Ops>
-            : S
-        > &
-          OpMethods<Ops, S>
+            : S,
+          Ops
+        > & { (): ExtendResult<S, Ops> }
       : keyof Ops extends infer K extends keyof Ops
         ? Ops[K] extends
             | Op<any, infer Out extends Shape>
@@ -77,12 +76,12 @@ export type ExtendResult<S, Ops extends OpMap> =
                 ? ResolvedOpsDeferred<Out, Ops>
                 : S extends Bound<any>
                   ? Bound<Out>
-                  : never
-            > &
-              OpMethods<Ops, S>
+                  : never,
+              Ops
+            > & { (): ExtendResult<S, Ops> }
           : never
         : never
-    : Assembled<S> & OpMethods<Ops, S>;
+    : Assembled<S, Ops>;
 
 /**
  * The common composition: `pirell().extend(ops)` — deferred surface,
@@ -98,7 +97,9 @@ export type ExtendResult<S, Ops extends OpMap> =
  * $([1, 2]).double().value; // [2, 4]
  * ```
  */
-export type Extended<Ops extends OpMap> = ExtendResult<Deferred<[]>, Ops>;
+export type Extended<Ops extends OpMap> = ExtendResult<Deferred<[]>, Ops> & {
+  (): ExtendResult<Deferred<[]>, Ops>;
+};
 
 /**
  * A chained data-bound surface: `pirell(data).op(...).op(...)` — data
@@ -106,51 +107,32 @@ export type Extended<Ops extends OpMap> = ExtendResult<Deferred<[]>, Ops>;
  * chains as `BoundWith<typeof ops, Out>`.
  */
 export type BoundWith<Ops extends OpMap, Out extends Shape> = Assembled<
-  Bound<Out>
-> &
-  OpMethods<Ops, Bound<Out>>;
+  Bound<Out>,
+  Ops
+>;
 
 /**
- * A surface's methods, as an interface so `.d.ts` emit keeps it by
- * name instead of re-expanding `extend`/`pipe`'s conditionals at every
- * surface (aliases inline in emit; interfaces are referenced by name).
- * The data type itself (`S`) stays an intersection underneath.
+ * A chain op's surface method (`.pipe`/`.compose`: branded var-args-fn
+ * ops). Bound surfaces re-bind to the composed result; deferred
+ * surfaces append and stay deferred. Named once so `Fluent` can
+ * reference it structurally — no op name appears anywhere (`Fluent`
+ * recognizes the op by its `chain` brand, what `markChain` attaches).
  */
-export interface ISurface<S> {
-  /**
-   * Wires ops onto the surface. A single op narrows `S` to its `Out`;
-   * union ops are un-narrowable, so the deferred surface is kept with
-   * only ops re-wired (a fresh register call then stays deferred
-   * rather than dropping the ops).
-   */
-  extend<Ops extends OpMap>(ops: Ops): ExtendResult<S, Ops>;
-  /**
-   * Threads the bound value through functions, or appends them lazily
-   * on a deferred surface. Both surface kinds return a surface —
-   * bound applies immediately, deferred appends.
-   */
-  pipe<Fns extends ChainFns<S>>(
+export type ChainMethod<S, Ops extends OpMap = {}> = {
+  <Fns extends ChainFns<S>>(
     ...fns: Fns & Tail<Fns, CurrentData<S>>
   ): S extends Deferred<any>
-    ? Assembled<S>
+    ? Assembled<S, Ops>
     : S extends Bound<any>
-      ? Assembled<Bound<ShapeOf<ComposeResult<Fns>>>>
-      : Assembled<S>;
-  /**
-   * Lazy composition — same behavior as `.pipe()` on the surface.
-   */
-  compose<Fns extends ChainFns<S>>(
-    ...fns: Fns & Tail<Fns, CurrentData<S>>
-  ): S extends Deferred<any>
-    ? Assembled<S>
-    : S extends Bound<any>
-      ? Assembled<Bound<ShapeOf<ComposeResult<Fns>>>>
-      : Assembled<S>;
-}
+      ? Assembled<Bound<ShapeOf<ComposeResult<Fns>>>, Ops>
+      : Assembled<S, Ops>;
+};
 
 /**
- * The decorated `pirell()` surface: methods plus data. `.extend()`
- * always accepts; shape checking fires on `Fluent`'s return (its
- * mismatch arm is uncallable), not at registration.
+ * The decorated surface: its ops map wired as callable methods, plus
+ * the data (shape `S`). Nothing is hardcoded — `.extend`, `.pipe`, and
+ * `.compose` are ordinary map entries (`coreOps` seeds them), typed by
+ * `Fluent` exactly like any package op. A surface offers precisely
+ * what its ops map offered.
  */
-export type Assembled<S> = ISurface<S> & S;
+export type Assembled<S, Ops extends OpMap = {}> = OpMethods<Ops, S> & S;
