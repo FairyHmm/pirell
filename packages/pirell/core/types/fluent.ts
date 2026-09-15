@@ -1,8 +1,12 @@
 // Fluent<F,S,Ops>: a wired method. Dispatch is structural, never by op
-// name — two tagged families first, then shape claims:
+// name and never by runtime brand — two tagged families first, then
+// shape claims:
 //  - a call yielding a Registration (extend's op body) → generic
 //    ops-map call
-//  - an op carrying the chain brand (markChain) → chain method
+//  - a genuinely variadic signature (accepts an arbitrary-length arg
+//    tuple, e.g. compose's `<Fns extends unknown[]>(...fns: Fns)`) →
+//    chain method. Fixed-arity factories (including zero-arg ones like
+//    `.flat()`) don't accept an arbitrary tuple and fall through.
 // Check fires at the call; Ops re-wire onto Bound<Out> (unfit siblings
 // uncallable, not vanished); the failure arm sits outside the arrow so
 // the call itself is uncallable (TS2349).
@@ -10,7 +14,6 @@
 import type { Bound, Op, OpLike, Shape } from "./base.js";
 import type { MatchShape } from "./match-shape.js";
 import type { Registration } from "../entry/surface.js";
-import type { chain } from "../entry/compose.js";
 import type {
   Assembled,
   ChainMethod,
@@ -48,6 +51,18 @@ type OutOf<RD extends unknown> = [unknown] extends [RD]
       ? ["k", "..."]
       : never;
 
+// True only for signatures that genuinely accept an arbitrary-length
+// arg tuple (compose's `<Fns extends unknown[]>(...fns: Fns)`), tested
+// by probing whether a concrete 2-tuple unifies with the inferred arg
+// tuple. Fixed-arity signatures — including zero-arg factories like
+// `() => (data) => R`, whose own arg tuple is the fixed `[]`, not an
+// open `unknown[]` — reject the probe tuple and resolve false.
+type IsVariadic<F> = F extends (...args: infer A) => any
+  ? [string, number] extends A
+    ? true
+    : false
+  : false;
+
 /**
  * A wired surface method: matches the op's claim against the surface's
  * proven shape, re-wiring sibling ops onto the output. The check fires
@@ -60,7 +75,7 @@ export type Fluent<F extends OpLike, S, Ops extends OpMap = {}> =
   // `{ ...ops, ...result.ops }`, same semantics as runtime.
   F extends (ops: infer _O extends OpMap) => (data: any) => Registration
     ? <O2 extends OpMap>(ops: O2) => ExtendResult<S, O2 & Ops>
-    : F extends chain
+    : IsVariadic<F> extends true
       ? ChainMethod<S, Ops>
       : F extends (...args: infer A) => infer R
         ? R extends (data: any) => any

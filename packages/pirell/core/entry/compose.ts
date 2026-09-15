@@ -1,17 +1,6 @@
 import type { ComposeChain, ComposeResult, FirstData } from "../types/chain.js";
 import { makeFlat } from "../ops/ops.js";
 
-/** Brand marking a var-args-fn op as a chain. Type-level counterpart of the `REGISTER` tag; `Fluent` routes on it. */
-export type chain = { readonly __pirellChain: true };
-
-/**
- * Brands a var-args-fn op as a chain: its method threads the surface
- * through the functions and re-wires siblings. Type-only brand — the
- * value is returned unchanged.
- */
-export const markChain = <F extends (...fns: any[]) => any>(fn: F): F & chain =>
-  fn as F & chain;
-
 /**
  * Runs functions left to right, returning a reusable pipeline — data
  * is applied later, checked then against the first link's entry claim.

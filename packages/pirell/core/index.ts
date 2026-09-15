@@ -16,7 +16,7 @@
  * @module
  */
 export * from "./types/public.js";
-export { pipe, compose, markChain } from "./entry/compose.js";
+export { pipe, compose } from "./entry/compose.js";
 export { extend } from "./entry/extend.js";
 export { buildBound, buildDeferred } from "./entry/builders.js";
 export { makeFlat, makeCurry } from "./ops/ops.js";
@@ -24,16 +24,17 @@ export { SURFACE, isSurface, valueOf } from "./entry/surface.js";
 export { each } from "./entry/each.js";
 
 import { pirell as pirellRaw } from "./entry/pirell.js";
-import { compose, markChain } from "./entry/compose.js";
+import { compose } from "./entry/compose.js";
 import { each } from "./entry/each.js";
 import { extend, extendOp } from "./entry/extend.js";
 import type { Extended } from "./types/assembled.js";
 
 // Everything `pirell` offers, seeded via extend like any package's own
-// map — pipe/compose are marked chains ({@linkcode markChain}).
+// map — pipe/compose are ordinary variadic ops, chain-dispatched by
+// Fluent's structural IsVariadic check (no runtime brand).
 export const coreOps = {
-  pipe: markChain(compose),
-  compose: markChain(compose),
+  pipe: compose,
+  compose,
   each,
   extend: extendOp,
 };

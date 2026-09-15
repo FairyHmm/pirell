@@ -9,7 +9,6 @@ import {
   buildBound,
   buildDeferred,
   compose,
-  markChain,
   each,
 } from "../index.js";
 
@@ -81,10 +80,10 @@ describe("recreating the library through the public API", () => {
 });
 
 describe("recreating pirell() itself from buildBound/buildDeferred", () => {
-  // pipe/compose are marked as chains — var-args-fn ops that re-bind the
-  // surface; that's what makes `.pipe` a chain method here, exactly as
-  // core's own ops map does it.
-  const myOps = { pipe: markChain(compose), compose: markChain(compose), each };
+  // pipe/compose are ordinary variadic ops here — Fluent's structural
+  // IsVariadic check makes `.pipe` a chain method with no brand needed,
+  // exactly as core's own ops map does it.
+  const myOps = { pipe: compose, compose, each };
 
   function myPirell<T>(data: T): BoundWith<typeof myOps, ShapeOf<T>>;
   function myPirell(): Extended<typeof myOps>;
