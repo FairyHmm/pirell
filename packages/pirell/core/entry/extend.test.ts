@@ -6,7 +6,7 @@ import { double, nth } from "../ops/fixture-ops.js";
 
 describe("standalone extend()", () => {
   it("applied directly, mirrors the .extend() method (Deferred)", () => {
-    const chain = (extend({ double })(pirell()) as any).double();
+    const chain = extend({ double })(pirell()).double();
     const result = chain([1, 2, 3]);
     expect(result.value).toEqual([2, 4, 6]);
   });
@@ -14,8 +14,7 @@ describe("standalone extend()", () => {
   it("works on a data-bound surface too", () => {
     // extend(ops) accepts either a deferred or a data-bound surface —
     // same wiring mechanism
-    const result = (extend({ double })(pirell([1, 2, 3])) as any).double()
-      .value;
+    const result = extend({ double })(pirell([1, 2, 3])).double().value;
     expect(result).toEqual([2, 4, 6]);
   });
 
@@ -44,7 +43,9 @@ describe("standalone extend()", () => {
   it("rejects a parameterized op at runtime too, with an actionable message", () => {
     // Same call, forced past the type system (e.g. a JS caller, or `as any`)
     // — the arity check is a real runtime guard, not just a type-level one.
-    expect(() => (extend as any)(nth)([1, 2, 3])).toThrow(
+    // FINDING (deferred): running past the type-level rejection needs an
+    // escape hatch (design pending, per audit) — compiles to an error for now.
+    expect(() => extend(nth)([1, 2, 3])).toThrow(
       /parameterized ops aren't supported/,
     );
   });

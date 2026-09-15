@@ -38,6 +38,10 @@ export type ResolvedOpsDeferred<
     : never
   : never;
 
+/** The surface an op application lands on: a deferred surface stays deferred (no data to gate yet — its calls bind `T` and validate claims at bind time), a bound one collapses to the result. */
+export type OpResultSurface<S, Out extends Shape, Ops extends OpMap> =
+  S extends Deferred<any> ? ResolvedOpsDeferred<Out, Ops> : Bound<Out>;
+
 type ChainFns<S> = [(arg: CurrentData<S>) => any, ...Array<(arg: any) => any>];
 
 /** What `surface.extend(ops)` returns — named once for publishers. */
@@ -54,14 +58,9 @@ export type ExtendResult<S, Ops extends OpMap> =
         ? Ops[K] extends
             | Op<any, infer Out extends Shape>
             | ((...args: any[]) => Op<any, infer Out extends Shape>)
-          ? Assembled<
-              S extends Deferred<any>
-                ? ResolvedOpsDeferred<Out, Ops>
-                : S extends Bound<any>
-                  ? Bound<Out>
-                  : never,
-              Ops
-            > & { (): ExtendResult<S, Ops> }
+          ? Assembled<OpResultSurface<S, Out, Ops>, Ops> & {
+              (): ExtendResult<S, Ops>;
+            }
           : never
         : never
     : Assembled<S, Ops>;
@@ -92,16 +91,19 @@ export type BoundWith<Ops extends OpMap, Out extends Shape> = Assembled<
   Ops
 >;
 
-/** A chain op's surface method: bound surfaces re-bind to the composed result; deferred append and stay deferred. */
-export type ChainMethod<S, Ops extends OpMap = {}> = {
-  <Fns extends ChainFns<S>>(
-    ...fns: Fns & Tail<Fns, CurrentData<S>>
-  ): S extends Deferred<any>
-    ? Assembled<S, Ops>
+/** A chain op's surface method: bound surfaces re-bind to the composed result; deferred append stays deferred (nothing to gate on yet — its calls bind any `T` and validate claims then). */
+export type ChainMethod<S, Ops extends OpMap = {}> =
+  S extends Deferred<any>
+    ? {
+        <Fns extends Array<(arg: any) => any>>(...fns: Fns): Assembled<S, Ops>;
+      }
     : S extends Bound<any>
-      ? Assembled<Bound<ShapeOf<ComposeResult<Fns>>>, Ops>
-      : Assembled<S, Ops>;
-};
+      ? {
+          <Fns extends ChainFns<S>>(
+            ...fns: Fns & Tail<Fns, CurrentData<S>>
+          ): Assembled<Bound<ShapeOf<ComposeResult<Fns>>>, Ops>;
+        }
+      : never;
 
 /** The decorated surface: its ops map wired as callable methods, plus the data (shape `S`). */
 export type Assembled<S, Ops extends OpMap = {}> = OpMethods<Ops, S> & S;

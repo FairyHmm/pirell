@@ -41,7 +41,7 @@ describe("recreating the library through the public API", () => {
   });
 
   it("user ops register via extend() exactly like a built-in", () => {
-    const surface = (pirell() as any).extend({ groupBy, sum });
+    const surface = pirell().extend({ groupBy, sum });
 
     const paid = surface([{ status: "paid" }, { status: "open" }]).groupBy(
       "status",
@@ -56,21 +56,21 @@ describe("recreating the library through the public API", () => {
   });
 
   it("standalone extend(ops)(surface) works on a data-bound surface", () => {
-    const result = (
-      extend({ sum })(pirell([{ amount: 4 }, { amount: 6 }])) as any
-    ).sum("amount").value;
+    const result = extend({ sum })(pirell([{ amount: 4 }, { amount: 6 }])).sum(
+      "amount",
+    ).value;
     expect(result).toBe(10);
   });
 
   it("extends are chainable across successive results", () => {
-    const total = (pirell([{ amount: 1 }, { amount: 2 }, { amount: 3 }]) as any)
+    const total = pirell([{ amount: 1 }, { amount: 2 }, { amount: 3 }])
       .extend({ sum })
       .sum("amount").value;
     expect(total).toBe(6);
   });
 
   it("a data-less build assembled purely from user ops, then bound to data", () => {
-    const chain = (pirell() as any).extend({ groupBy, sum }).groupBy("status");
+    const chain = pirell().extend({ groupBy, sum }).groupBy("status");
     const result = chain([{ status: "a" }, { status: "b" }, { status: "a" }]);
     expect(result.value).toEqual({
       a: [{ status: "a" }, { status: "a" }],

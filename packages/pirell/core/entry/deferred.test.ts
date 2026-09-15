@@ -18,7 +18,7 @@ describe("Deferred.value typing", () => {
 
 describe("Deferred (pirell()): builder surfaces", () => {
   it("builds a fluent transform, callable with raw JSON", () => {
-    const chain = (pirell() as any)
+    const chain = pirell()
       .extend({ double })
       .double()
       .extend({ sumAll })
@@ -29,7 +29,7 @@ describe("Deferred (pirell()): builder surfaces", () => {
   });
 
   it("works with object shape [Keyed, ...]", () => {
-    const chain = (pirell() as any)
+    const chain = pirell()
       .extend({ toEntries })
       .toEntries()
       .extend({ flattenEntries })
@@ -40,7 +40,7 @@ describe("Deferred (pirell()): builder surfaces", () => {
   });
 
   it("works with nested shape [Keyed, Indexed, ...]", () => {
-    const chain = (pirell() as any)
+    const chain = pirell()
       .extend({ sumValues })
       .sumValues()
       .extend({ toEntries })
@@ -56,28 +56,28 @@ describe("Deferred (pirell()): builder surfaces", () => {
 
 describe("Deferred.pipe / compose (lazy)", () => {
   it("pipe builds a chain, callable with raw JSON", () => {
-    const chain = (pirell() as any).pipe(double, sumAll);
+    const chain = pirell().pipe(double, sumAll);
 
     const result = chain([1, 2, 3]);
     expect(result.value).toBe(12);
   });
 
   it("pipe through shape transitions", () => {
-    const chain = (pirell() as any).pipe(toEntries, flattenEntries, double);
+    const chain = pirell().pipe(toEntries, flattenEntries, double);
 
     const result = chain({ a: 1, b: 2 });
     expect(result.value).toEqual([2, 4]);
   });
 
   it("compose builds a chain, callable with raw JSON", () => {
-    const chain = (pirell() as any).compose(double, sumAll);
+    const chain = pirell().compose(double, sumAll);
 
     const result = chain([1, 2, 3]);
     expect(result.value).toBe(12);
   });
 
   it("compose with shape transitions", () => {
-    const chain = (pirell() as any).compose(toEntries, flattenEntries, double);
+    const chain = pirell().compose(toEntries, flattenEntries, double);
 
     const result = chain({ a: 1, b: 2 });
     expect(result.value).toEqual([2, 4]);
@@ -86,7 +86,9 @@ describe("Deferred.pipe / compose (lazy)", () => {
 
 describe("splitting a chain in two (value reuse)", () => {
   it("one-line chain equals the split chain", () => {
-    const entry = (pirell() as any).extend({ double, sumAll });
+    // FINDING (deferred): re-feeding a bound surface's result widens to a
+    // keyed shape (spread/brandless caveat) — escape hatch pending, per audit.
+    const entry = pirell().extend({ double, sumAll });
 
     const oneLine = entry([1, 2, 3]).double().sumAll();
 

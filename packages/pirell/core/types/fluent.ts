@@ -11,7 +11,7 @@
 // uncallable, not vanished); the failure arm sits outside the arrow so
 // the call itself is uncallable (TS2349).
 
-import type { Bound, Op, OpLike, Shape } from "./base.js";
+import type { Deferred, Op, OpLike, Shape } from "./base.js";
 import type { MatchShape } from "./match-shape.js";
 import type { Registration } from "../entry/surface.js";
 import type {
@@ -20,6 +20,7 @@ import type {
   CurrentShp,
   ExtendResult,
   OpMap,
+  OpResultSurface,
 } from "./assembled.js";
 
 /**
@@ -91,29 +92,37 @@ export type Fluent<F extends OpLike, S, Ops extends OpMap = {}> =
  */
 type FactoryPath<A extends unknown[], R, S, Ops extends OpMap> =
   R extends Op<infer FIn extends Shape, infer FOut extends Shape>
-    ? MatchShape<FIn, CurrentShp<S>> extends true
-      ? (...args: A) => Assembled<Bound<FOut>, Ops>
-      : ShapeMismatch<FIn, CurrentShp<S>>
+    ? S extends Deferred<any>
+      ? (...args: A) => Assembled<OpResultSurface<S, FOut, Ops>, Ops>
+      : MatchShape<FIn, CurrentShp<S>> extends true
+        ? (...args: A) => Assembled<OpResultSurface<S, FOut, Ops>, Ops>
+        : ShapeMismatch<FIn, CurrentShp<S>>
     : R extends (data: infer D) => infer RD
-      ? [ClaimOf<D>] extends [never]
-        ? ShapeMismatch<never, CurrentShp<S>>
-        : MatchShape<ClaimOf<D>, CurrentShp<S>> extends true
-          ? (...args: A) => Assembled<Bound<OutOf<RD>>, Ops>
-          : ShapeMismatch<ClaimOf<D>, CurrentShp<S>>
+      ? S extends Deferred<any>
+        ? (...args: A) => Assembled<OpResultSurface<S, OutOf<RD>, Ops>, Ops>
+        : [ClaimOf<D>] extends [never]
+          ? ShapeMismatch<never, CurrentShp<S>>
+          : MatchShape<ClaimOf<D>, CurrentShp<S>> extends true
+            ? (...args: A) => Assembled<OpResultSurface<S, OutOf<RD>, Ops>, Ops>
+            : ShapeMismatch<ClaimOf<D>, CurrentShp<S>>
       : never;
 
 /** A data op as a whole function (direct Op or aliased one). */
 type DirectOpPath<F, S, Ops extends OpMap> =
   F extends Op<infer In extends Shape, infer Out extends Shape>
-    ? MatchShape<In, CurrentShp<S>> extends true
-      ? () => Assembled<Bound<Out>, Ops>
-      : ShapeMismatch<In, CurrentShp<S>>
+    ? S extends Deferred<any>
+      ? () => Assembled<OpResultSurface<S, Out, Ops>, Ops>
+      : MatchShape<In, CurrentShp<S>> extends true
+        ? () => Assembled<OpResultSurface<S, Out, Ops>, Ops>
+        : ShapeMismatch<In, CurrentShp<S>>
     : F extends (data: infer D2) => any
-      ? [ClaimOf<D2>] extends [never]
-        ? ShapeMismatch<never, CurrentShp<S>>
-        : MatchShape<ClaimOf<D2>, CurrentShp<S>> extends true
-          ? () => Assembled<Bound<OutOf<unknown>>, Ops>
-          : ShapeMismatch<ClaimOf<D2>, CurrentShp<S>>
+      ? S extends Deferred<any>
+        ? () => Assembled<OpResultSurface<S, [], Ops>, Ops>
+        : [ClaimOf<D2>] extends [never]
+          ? ShapeMismatch<never, CurrentShp<S>>
+          : MatchShape<ClaimOf<D2>, CurrentShp<S>> extends true
+            ? () => Assembled<OpResultSurface<S, [], Ops>, Ops>
+            : ShapeMismatch<ClaimOf<D2>, CurrentShp<S>>
       : never;
 
 // Interfaces can't extend a mapped type (TS2312), so this stays an alias.

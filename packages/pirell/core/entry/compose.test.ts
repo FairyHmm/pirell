@@ -169,13 +169,13 @@ describe("standalone pipe/compose shape rejection (compile-time)", () => {
 describe("compose/pipe: unchecked spread-array chains fail loudly", () => {
   it("wraps a stage's runtime error with stage index and cause", () => {
     const fns: Array<typeof double> = [double];
-    expect(() => pipe({ a: 1 } as any, ...fns)).toThrow(/stage 0 threw/);
+    expect(() => pipe({ a: 1 }, ...fns)).toThrow(/stage 0 threw/);
   });
 
   it("preserves the original error as `cause`", () => {
     const fns: Array<typeof double> = [double];
     try {
-      pipe({ a: 1 } as any, ...fns);
+      pipe({ a: 1 }, ...fns);
       expect.unreachable();
     } catch (err) {
       expect(err).toBeInstanceOf(Error);
