@@ -37,7 +37,9 @@ export function compile(fileContent: string, extraArgs: string[] = []): string {
   } catch (err) {
     // tsc exits non-zero on type errors — the caller still needs the text.
     const e = err as { stdout?: unknown; stderr?: unknown };
-    stdout = String(e.stdout ?? "") + String(e.stderr ?? "");
+    const out = typeof e.stdout === "string" ? e.stdout : "";
+    const errText = typeof e.stderr === "string" ? e.stderr : "";
+    stdout = out + errText;
   }
   return stdout;
 }

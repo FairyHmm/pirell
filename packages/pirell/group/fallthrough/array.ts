@@ -69,7 +69,7 @@ export const sort =
 export const slice =
   (start?: number, end?: number): Rewrap =>
   (data) =>
-    data.slice(start, end);
+    data.slice(start ?? 0, end);
 
 /**
  * Flattens nested arrays.
@@ -239,9 +239,10 @@ export const lastIndexOf =
   (data) => {
     // Explicit-undefined fromIndex coerces to 0 in native lastIndexOf —
     // keep the omitted form forwarding no second argument (as reduce).
-    return rest.length === 0
+    const [fromIndex] = rest;
+    return fromIndex === undefined
       ? data.lastIndexOf(value)
-      : data.lastIndexOf(value, rest[0]);
+      : data.lastIndexOf(value, fromIndex);
   };
 
 /**
