@@ -25,7 +25,8 @@
   "scripts": {
     "build": "tsdown",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "jsr:check": "deno publish --dry-run --no-prompt"
   },
   "dependencies": {
     "@pirell/core": "workspace:*"
