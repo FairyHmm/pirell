@@ -40,7 +40,7 @@ import type { Extended } from "./types/assembled.js";
 // `.extend()` dispatches to; including it here is what makes it exist,
 // like any package adding it to its own map. pipe/compose are marked
 // chains — var-args-fn ops that re-bind the surface (markChain, the
-// type-level counterpart of markRegistering).
+// type-level counterpart of extendOp's REGISTER tag).
 export const coreOps = {
   pipe: markChain(compose),
   compose: markChain(compose),

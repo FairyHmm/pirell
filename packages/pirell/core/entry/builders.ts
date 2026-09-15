@@ -1,7 +1,7 @@
 import {
+  REGISTER,
   SURFACE,
   isRegistration,
-  isRegisteringOp,
   isSurface,
   valueOf,
 } from "./surface.js";
@@ -118,37 +118,19 @@ export function buildDeferred(
     // Registration must grow this Deferred's table before data arrives
     // (ops are known immediately), but a real op can't be speculatively
     // run on fake data (zero-arg calls are ambiguous, and ops may have
-    // side effects). The op itself carries markRegistering's tag instead —
+    // side effects). The op itself carries the REGISTER tag instead —
     // checked without invoking anything — so extend (extendOp) resolves
     // immediately and any future registering op gets the same for free;
     // nothing here names `extend` specifically.
     applyOp: (op, args) => {
-      const result = isRegisteringOp(op)
-        ? runOp(op, args, undefined)
-        : undefined;
+      const result =
+        typeof op === "function" && REGISTER in (op as any)
+          ? runOp(op, args, undefined)
+          : undefined;
       if (isRegistration(result)) {
         return buildDeferred(steps, { ...ops, ...result.ops });
       }
       return buildDeferred([...steps, (data) => runOp(op, args, data)], ops);
     },
   });
-}
-
-// The standalone extend(surface, ops) free function (entry/extend.ts)
-// must grow a surface's table even when it has no `.extend` method yet
-// — only true for a genuinely bare `ops: {}` surface fresh off
-// pirellRaw(), which by construction has zero accumulated Deferred
-// steps (nothing could have been called on it; it has no methods).
-// Anything with `.extend` already goes through the ordinary
-// Registration path in applyOp above, which does preserve steps — this
-// is bootstrap-only, not a general surface-growing primitive.
-export function growBareSurface(surface: any, ops: OpMap): any {
-  if (typeof surface.extend === "function") {
-    throw new TypeError(
-      "growBareSurface: surface already has .extend — use surface.extend(ops) instead.",
-    );
-  }
-  return surface.value === undefined
-    ? buildDeferred([], ops)
-    : buildBound(surface.value, ops);
 }

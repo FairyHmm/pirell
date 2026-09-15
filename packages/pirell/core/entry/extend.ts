@@ -1,22 +1,23 @@
 import type { ExtendResult, OpMap } from "../types/assembled.js";
-import {
-  isSurface,
-  makeRegistration,
-  markRegistering,
-  valueOf,
-} from "./surface.js";
-import { growBareSurface } from "./builders.js";
+import type { Registration } from "./surface.js";
+import { REGISTER, isSurface, valueOf } from "./surface.js";
+import { buildBound, buildDeferred } from "./builders.js";
 
 // The op body behind every surface's `.extend()` method (wired into
 // coreOps in index.ts) and this module's standalone free function
 // alike — one definition, so exactly one place knows what "extend"
 // does. Its result grows the surface's method table instead of
 // producing data (invisible to Op<In,Out>'s Shape-typed Out, PLAN.md
-// item 1); markRegistering tags it so buildDeferred grows its table
-// immediately (entry/builders.ts) instead of deferring it as a step.
-export const extendOp = markRegistering(
-  (ops: OpMap) => (_data: unknown) => makeRegistration(ops),
-);
+// item 1). The `REGISTER` tag the op carries (a deferred surface can't
+// invoke on real data to check the result, so buildDeferred checks the
+// op itself, without invoking) makes the grown table apply immediately
+// rather than deferring extend as a step; the type-level counterpart
+// of that tag is `markChain`.
+export const extendOp = Object.assign(
+  (ops: OpMap): ((_data: unknown) => Registration) =>
+    (_data: unknown) => ({ [REGISTER]: true, ops }),
+  { [REGISTER]: true },
+) as (ops: OpMap) => (_data: unknown) => Registration;
 
 /**
  * Wires new ops onto a surface. Accepts anything registrable: a data
@@ -82,11 +83,14 @@ function applyExtend(surface: any, ops: OpMap): any {
   }
   // The first bare surface (pirellRaw(), ops: {}) has no `.extend`
   // method — nothing has seeded one, by design (builders.ts: no name
-  // is privileged there). growBareSurface handles that bootstrap case;
-  // everything else uses its real method, going through the ordinary
-  // Registration/applyOp path like any other op.
+  // is privileged there). This bootstrap grows its table directly via
+  // buildBound/buildDeferred; everything else uses its real method,
+  // going through the ordinary Registration/applyOp path like any
+  // other op.
   if (typeof surface.extend !== "function") {
-    return growBareSurface(surface, ops);
+    return surface.value === undefined
+      ? buildDeferred([], ops)
+      : buildBound(surface.value, ops);
   }
   return surface.extend(ops);
 }

@@ -1,40 +1,12 @@
 import type { ComposeChain, ComposeResult, FirstData } from "../types/chain.js";
 import { makeFlat } from "../ops/ops.js";
 
-// Untyped runtime shared by typed compose below and the surface builders.
-// Stage-invoke + stage-error contract lives here exactly once.
-export function composeRaw(...fns: Array<(x: any) => any>): (x: any) => any {
-  // A zero-arg thunk link is applied once to reach its (data) => R
-  // stage; a data fn (op or pre-applied factory product) already is
-  // that stage.
-  const stages = fns.map((fn) => (fn.length === 0 ? (fn as () => any)() : fn));
-  return (x: any) =>
-    stages.reduce((acc, fn, i) => {
-      try {
-        return fn(acc);
-      } catch (err) {
-        // Spread-array chains skip compile-time shape checks
-        // (length: number isn't indexable per-link), so a stage error
-        // here is re-thrown with context instead of surfacing raw.
-        const label =
-          err instanceof Error ? `${err.name}: ${err.message}` : String(err);
-        throw new Error(
-          `compose/pipe: stage ${i} threw on its input (${label}). ` +
-            "If this chain came from a spread array rather than a literal call " +
-            "(e.g. `pipe(data, ...fns)`), shapes aren't checked at compile time for " +
-            "that form — verify each stage's declared In shape matches what the " +
-            "previous stage actually produces.",
-          { cause: err },
-        );
-      }
-    }, x);
-}
-
 /**
  * A chain op: var-args functions that re-bind the surface they ran on.
- * The type-level mirror of `markRegistering` (entry/surface.ts) — the
- * brand `Fluent` routes to the chain method; no op name is consulted.
- * Brand your own var-args-fn ops with {@linkcode markChain}.
+ * The type-level counterpart of the `REGISTER` tag extend's op carries
+ * (entry/surface.ts) — the brand `Fluent` routes to the chain method;
+ * no op name is consulted. Brand your own var-args-fn ops with
+ * {@linkcode markChain}.
  */
 export type chain = { readonly __pirellChain: true };
 
@@ -66,7 +38,30 @@ export function compose<Fns extends unknown[]>(
   ...fns: Fns & ComposeChain<Fns>
 ): (data: FirstData<Fns>) => ComposeResult<Fns>;
 export function compose(...fns: Array<(x: any) => any>): (x: any) => any {
-  return composeRaw(...fns);
+  // A zero-arg thunk link is applied once to reach its (data) => R
+  // stage; a data fn (op or pre-applied factory product) already is
+  // that stage.
+  const stages = fns.map((fn) => (fn.length === 0 ? (fn as () => any)() : fn));
+  return (x: any) =>
+    stages.reduce((acc, fn, i) => {
+      try {
+        return fn(acc);
+      } catch (err) {
+        // Spread-array chains skip compile-time shape checks (length:
+        // number isn't indexable per-link), so a stage error is thrown
+        // with context instead of surfacing raw.
+        const label =
+          err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+        throw new Error(
+          `compose/pipe: stage ${i} threw on its input (${label}). ` +
+            "If this chain came from a spread array rather than a literal call " +
+            "(e.g. `pipe(data, ...fns)`), shapes aren't checked at compile time for " +
+            "that form — verify each stage's declared In shape matches what the " +
+            "previous stage actually produces.",
+          { cause: err },
+        );
+      }
+    }, x);
 }
 
 // Data-first view of compose. The entry claim is authored here, not in

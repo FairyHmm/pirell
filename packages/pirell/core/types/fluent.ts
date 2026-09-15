@@ -11,8 +11,8 @@
 //  - an op carrying the chain brand (a marked var-args-fn op like
 //    `pipe: markChain(compose)` in an ops map) threads the surface
 //    through its functions and re-binds: what makeFlat turned data-first
-//    at runtime. The gate is that brand, the type-level mirror of
-//    markRegistering; publishers brand their own var-args-fn ops to get
+//    at runtime. The gate is that brand, the type-level counterpart of
+//    the REGISTER tag; publishers brand their own var-args-fn ops to get
 //    the same chain method.
 
 import type { Bound, Op, OpLike, Shape } from "./base.js";

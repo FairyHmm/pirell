@@ -39,18 +39,8 @@ type ChainEnds<Fns extends readonly unknown[]> =
       ? [ChainEntry<First>, ChainResult<Last>]
       : never;
 
-// First link's In (superseded by FirstData below, kept for compatibility).
-// ["..."] wherever the chain gives up (non-Op / parameterized / empty).
-export type FirstIn<Fns extends readonly unknown[]> =
-  ComposeChain<Fns> extends [infer First, ...unknown[]]
-    ? First extends Op<infer FIn extends Shape, any>
-      ? FIn
-      : ["..."]
-    : ["..."];
-
 // Concrete entry-data type from the first link's own annotation (no
-// DataOf re-derivation). Routing mirrors FirstIn exactly, so give-ups
-// stay identical.
+// DataOf re-derivation). Give-ups stay identical to ComposeChain's.
 export type FirstData<Fns extends readonly unknown[]> =
   Fns extends [infer F, ...unknown[]]
     ? IsThunk<F> extends true
