@@ -29,7 +29,7 @@ describe("groupBy", () => {
     const grouped = groupBy((o: (typeof orders)[number]) =>
       o.amount > 3 ? "big" : "small",
     )(orders);
-    expect(Object.keys(grouped).sort()).toEqual(["big", "small"]);
+    expect(Object.keys(grouped).sort((a, b) => a.localeCompare(b))).toEqual(["big", "small"]);
     expect(grouped.big).toHaveLength(2);
     expect(grouped.small).toHaveLength(1);
   });
@@ -100,7 +100,7 @@ describe("indexBy", () => {
     const indexed = indexBy((o: (typeof orders)[number]) => String(o.amount))(
       orders,
     );
-    expect(Object.keys(indexed).sort()).toEqual(["2", "5", "7"]);
+    expect(Object.keys(indexed).sort((a, b) => a.localeCompare(b))).toEqual(["2", "5", "7"]);
     expect(indexed["5"]).toEqual({ status: "paid", amount: 5 });
   });
 

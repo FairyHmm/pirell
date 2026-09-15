@@ -51,7 +51,7 @@ export const nth =
 export const take =
   (n?: number): Op<["i"], ["i"]> =>
   (data) =>
-    data.slice(0, n);
+    n === undefined ? data.slice(0) : data.slice(0, n);
 
 // Open-shape op for transition chains (closed `double` can't accept
 // the unknown[] flowing out of flattenEntries).

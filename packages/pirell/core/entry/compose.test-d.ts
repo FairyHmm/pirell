@@ -29,3 +29,19 @@ pipe({ a: 1 }, toEntries, double);
   // @ts-expect-error double expects [["i", number]], not ["k"] from bare object
   compose(double)({ a: 1 });
 }
+
+// compose rejects a mismatched chain at the type level.
+{
+  const toString = (n: number) => `${n}`;
+  const inc = (n: number) => n + 1;
+  // @ts-expect-error -- toString's output (string) doesn't match inc's input (number)
+  compose(toString, inc);
+}
+
+// pipe rejects a mismatched chain at the type level.
+{
+  const toString = (n: number) => `${n}`;
+  const inc = (n: number) => n + 1;
+  // @ts-expect-error -- toString's output (string) doesn't match inc's input (number)
+  pipe(1, toString, inc);
+}

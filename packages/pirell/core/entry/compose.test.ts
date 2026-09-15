@@ -36,13 +36,6 @@ describe("compose", () => {
     );
     expect(run(1)).toBe(true);
   });
-
-  it("rejects a mismatched chain at the type level", () => {
-    const toString = (n: number) => `${n}`;
-    const inc = (n: number) => n + 1;
-    // @ts-expect-error -- toString's output (string) doesn't match inc's input (number)
-    compose(toString, inc);
-  });
 });
 
 describe("pipe", () => {
@@ -69,13 +62,6 @@ describe("pipe", () => {
       (n: number) => n > 0,
     );
     expect(result).toBe(true);
-  });
-
-  it("rejects a mismatched chain at the type level", () => {
-    const toString = (n: number) => `${n}`;
-    const inc = (n: number) => n + 1;
-    // @ts-expect-error -- toString's output (string) doesn't match inc's input (number)
-    pipe(1, toString, inc);
   });
 });
 
