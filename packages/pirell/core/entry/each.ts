@@ -1,5 +1,5 @@
 import { isSurface, valueOf } from "./surface.js";
-import type { Op, Shape } from "../types/base.js";
+import type { Op } from "../types/base.js";
 
 /** Shape claim for keyed (record) data. */
 export type Keyed = ["k", "..."];
@@ -25,7 +25,7 @@ export const each =
   (op: (data: any) => any): Op<Keyed, Keyed> =>
   (data) =>
     Object.fromEntries(
-      Object.entries(data as Record<string, unknown>).map(([key, value]) => [
+      Object.entries(data).map(([key, value]) => [
         key,
         isSurface(op)
           ? valueOf((op as (d: unknown) => unknown)(value))

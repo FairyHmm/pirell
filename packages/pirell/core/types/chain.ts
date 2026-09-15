@@ -1,5 +1,4 @@
 import type { Op, Raw, Shape } from "./base.js";
-import type { DataOf } from "./codec.js";
 
 // --- Shape gate for compose/pipe ---
 
@@ -43,7 +42,7 @@ export type FirstData<Fns extends readonly unknown[]> =
       ? F extends (...args: any[]) => (data: infer D0) => any
         ? D0
         : unknown
-      : F extends Op<infer FIn extends Shape, any>
+      : F extends Op<infer _FIn extends Shape, any>
         ? F extends (data: infer D0) => any
           ? D0
           : unknown

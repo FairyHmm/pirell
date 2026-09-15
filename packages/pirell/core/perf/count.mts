@@ -9,7 +9,6 @@ import {
   findScenario,
   stressFile,
   topicScenarios,
-  wrapChain,
 } from "./scenarios.js";
 import {
   assertAndVersion,
@@ -206,9 +205,6 @@ function main(): void {
     for (const name of names) {
       const s = findScenario(SCENARIOS, name);
       const isStable = s.name.startsWith("stable-");
-      const body = isStable
-        ? `${STABLE_PREFIX}\n${countBody(s, counts[counts.length - 1]!)}`
-        : countBody(s, counts[counts.length - 1]!);
       const results = counts.map((n) => {
         const b = isStable
           ? `${STABLE_PREFIX}\n${countBody(s, n)}`

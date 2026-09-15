@@ -81,7 +81,7 @@ export type Fluent<F extends OpLike, S, Ops extends OpMap = {}> =
         ? R extends (data: any) => any
           ? // Ordinary factory: apply the args, then match its claim
             // against the surface's shape.
-            FactoryPath<F, A, R, S, Ops>
+            FactoryPath<A, R, S, Ops>
           : DirectOpPath<F, S, Ops>
         : never;
 
@@ -89,7 +89,7 @@ export type Fluent<F extends OpLike, S, Ops extends OpMap = {}> =
  * A fixed-arity factory: apply the args, get a data fn/op, then match
  * its claim against the surface's shape.
  */
-type FactoryPath<F, A extends unknown[], R, S, Ops extends OpMap> =
+type FactoryPath<A extends unknown[], R, S, Ops extends OpMap> =
   R extends Op<infer FIn extends Shape, infer FOut extends Shape>
     ? MatchShape<FIn, CurrentShp<S>> extends true
       ? (...args: A) => Assembled<Bound<FOut>, Ops>
