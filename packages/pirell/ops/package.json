@@ -1,8 +1,8 @@
 {
-  "name": "@pirell/group",
+  "name": "@pirell/ops",
   "author": "Fairy",
   "version": "0.1.0",
-  "description": "Grouping transformations that bucket data by keys.",
+  "description": "Standard operations for pirell pipelines: grouping, broadcast, and native Array/Object fallthroughs.",
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -15,8 +15,9 @@
   "license": "ISC",
   "keywords": [
     "data",
+    "pipeline",
+    "ops",
     "group",
-    "index",
     "typescript"
   ],
   "engines": {

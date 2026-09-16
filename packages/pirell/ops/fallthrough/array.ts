@@ -5,7 +5,7 @@
  * straight to a native method.
  *
  * ```ts
- * import { pirell } from "@pirell/group";
+ * import { pirell } from "@pirell/ops";
  *
  * pirell([3, 1, 2]).sort().value; // [1, 2, 3]
  * ```
@@ -274,7 +274,7 @@ export const length: Terminal = (data) => data.length;
  * Folds left to a single value.
  *
  * ```ts
- * import { pirell } from "@pirell/group";
+ * import { pirell } from "@pirell/ops";
  *
  * pirell([1, 2, 3]).reduce((a, b) => a + b, 0).value; // 6
  * ```

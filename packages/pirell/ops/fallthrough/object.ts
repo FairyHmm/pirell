@@ -8,7 +8,7 @@
  * results rewrap as an open column or pair rows.
  *
  * ```ts
- * import { pirell } from "@pirell/group";
+ * import { pirell } from "@pirell/ops";
  *
  * pirell({ a: 1, b: 2 }).entries().value; // [["a", 1], ["b", 2]]
  * ```
@@ -34,7 +34,7 @@ export const entries: Op<Keyed, Pairs> = Object.entries;
  * Rebuilds a record from pair rows — the inverse of {@linkcode entries}.
  *
  * ```ts
- * import { pirell } from "@pirell/group";
+ * import { pirell } from "@pirell/ops";
  *
  * pirell([["a", 1]]).fromEntries().value; // { a: 1 }
  * ```
@@ -47,7 +47,7 @@ export const fromEntries: Op<Pairs, ["k"]> = Object.fromEntries;
  * takes the sources up front, unlike the direct assignments above.
  *
  * ```ts
- * import { pirell } from "@pirell/group";
+ * import { pirell } from "@pirell/ops";
  *
  * pirell({ a: 1 }).assign({ b: 2 }).value; // { a: 1, b: 2 }
  * ```

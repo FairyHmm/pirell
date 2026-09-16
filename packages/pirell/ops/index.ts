@@ -1,10 +1,10 @@
 /**
- * Grouped data pipelines: {@linkcode pirell} bound with grouping, the
- * `each` broadcast combinator, plus the native `Array`/`Object`
- * fallthroughs.
+ * Standard operations for pirell pipelines: grouping (`groupBy`,
+ * `indexBy`), the `each` broadcast combinator, plus the native
+ * `Array`/`Object` fallthroughs.
  *
  * ```ts
- * import { pirell } from "@pirell/group";
+ * import { pirell } from "@pirell/ops";
  *
  * const totals = pirell([
  *   { status: "paid", amount: 5 },
@@ -15,7 +15,7 @@
  * totals.value; // all three rows, grouped then unwrapped
  * ```
  *
- * Method sets live in {@linkcode groupMethods} (`groupingMethods` +
+ * Method sets live in {@linkcode opsMethods} (`groupingMethods` +
  * `each` + `arrayFallthroughMethods` + `objectFallthroughMethods`); every op is
  * also exported standalone for `pipe` from `@pirell/core`.
  *
@@ -38,22 +38,22 @@ export * from "./fallthrough/object.js";
  * plus the array/object fallthroughs. Spread in your own ops to
  * compose a custom API — see {@linkcode Extended}.
  */
-export const groupMethods = {
+export const opsMethods = {
   ...groupingMethods,
   ...arrayFallthroughMethods,
   ...objectFallthroughMethods,
   each,
 };
 /** The ops map behind {@linkcode pirell}, as a type for composition. */
-export type GroupOps = typeof groupMethods;
+export type Ops = typeof opsMethods;
 /**
  * Data-bound entry: call with JSON data, chain ops, read `.value`.
  *
  * ```ts
- * import { pirell } from "@pirell/group";
+ * import { pirell } from "@pirell/ops";
  *
  * pirell([3, 1, 2]).sort().value; // [1, 2, 3]
  * ```
  */
-export const pirell: Extended<CoreOps & GroupOps> =
-  pirellRaw().extend(groupMethods);
+export const pirell: Extended<CoreOps & Ops> =
+  pirellRaw().extend(opsMethods);

@@ -13,7 +13,7 @@ export type GroupKey<R> = string | ((row: R) => string);
  * or key function. Rows missing the key land under `"undefined"`.
  *
  * ```ts
- * import { pirell } from "@pirell/group";
+ * import { pirell } from "@pirell/ops";
  *
  * pirell([
  *   { status: "paid", amount: 5 },
@@ -43,7 +43,7 @@ export const groupBy =
  * name or key function. Last row wins on key collision.
  *
  * ```ts
- * import { pirell } from "@pirell/group";
+ * import { pirell } from "@pirell/ops";
  *
  * pirell([
  *   { id: "a", amount: 5 },

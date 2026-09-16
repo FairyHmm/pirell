@@ -1,5 +1,5 @@
 {
-  "name": "@pirell/group",
+  "name": "@pirell/ops",
   "version": "0.1.0",
   "exports": "./index.ts",
   "publish": {
