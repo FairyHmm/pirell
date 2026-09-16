@@ -17,7 +17,7 @@
  */
 export * from "./types/public.js";
 export { pipe, compose } from "./entry/compose.js";
-export { extend } from "./entry/extend.js";
+export { extend, type Extended } from "./entry/extend.js";
 export { buildBound, buildDeferred } from "./entry/builders.js";
 export { makeFlat, makeCurry } from "./ops/ops.js";
 export { SURFACE, isSurface, valueOf } from "./entry/surface.js";
@@ -26,12 +26,11 @@ export { each } from "./entry/each.js";
 import { pirell as pirellRaw } from "./entry/pirell.js";
 import { compose } from "./entry/compose.js";
 import { each } from "./entry/each.js";
-import { extend, extendOp } from "./entry/extend.js";
-import type { Extended } from "./types/assembled.js";
+import { extend, extendOp, type Extended } from "./entry/extend.js";
 
 // Everything `pirell` offers, seeded via extend like any package's own
-// map — pipe/compose are ordinary variadic ops, chain-dispatched by
-// Fluent's structural IsVariadic check (no runtime brand).
+// map — pipe/compose and extend carry type-only brands routing them to
+// their registry wiring (no runtime brand, no structural probe).
 export const coreOps = {
   pipe: compose,
   compose,

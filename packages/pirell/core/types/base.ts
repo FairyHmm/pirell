@@ -84,3 +84,22 @@ export interface Deferred<Out extends Shape> {
   (data: unknown): Bound<Out>;
   readonly value: undefined;
 }
+
+/** A method table: names to registrable ops. */
+export type OpMap = Record<string, OpLike>;
+
+/** Bound value read off the surface's shape (Deferred checked first — it satisfies Bound too). */
+export type CurrentData<S> =
+  S extends Deferred<infer Out extends Shape>
+    ? Raw<Out>
+    : S extends Bound<infer Shp extends Shape>
+      ? Raw<Shp>
+      : never;
+
+/** The surface's proven shape, read fresh at each call. */
+export type CurrentShp<S> =
+  S extends Deferred<infer Out extends Shape>
+    ? Out
+    : S extends Bound<infer Shp extends Shape>
+      ? Shp
+      : ["..."];

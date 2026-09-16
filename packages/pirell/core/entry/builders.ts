@@ -6,9 +6,10 @@ import {
   valueOf,
 } from "./surface.js";
 import type { Bound, Deferred, OpLike } from "../types/base.js";
-import type { Assembled, OpMap } from "../types/assembled.js";
+import type { OpMap } from "../types/base.js";
+import type { Assembled } from "../types/wrapper.js";
 
-// Runtime surface builders (surface types live in types/assembled.ts).
+// Runtime surface builders (surface types live in types/wrapper.ts).
 // One shared assembly sequence; Bound and Deferred differ only in what
 // each step means (eager vs lazy).
 

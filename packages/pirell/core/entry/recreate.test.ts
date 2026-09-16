@@ -20,7 +20,8 @@ const rowsOf = (data: unknown): Record<string, unknown>[] =>
   data as Record<string, unknown>[];
 
 // groupBy partitions keyed rows.
-const groupBy = (key: string): Op<["i", "k", "..."], ["k", "i", "k", "..."]> =>
+const groupBy =
+  (key: string): Op<["i", "k", "..."], ["k", "i", "k", "..."]> =>
   (data: unknown) => {
     const rows = rowsOf(data);
     const groups: Record<string, Record<string, unknown>[]> = {};
@@ -33,7 +34,8 @@ const groupBy = (key: string): Op<["i", "k", "..."], ["k", "i", "k", "..."]> =>
   };
 
 // A second user op sharing the same registration path.
-const sum = (key: string): Op<["i", "k", "..."], []> =>
+const sum =
+  (key: string): Op<["i", "k", "..."], []> =>
   (data: unknown) => {
     const rows = rowsOf(data);
     return rows.reduce((acc, row) => acc + Number(row[key]), 0);
@@ -88,9 +90,8 @@ describe("recreating the library through the public API", () => {
 });
 
 describe("recreating pirell() itself from buildBound/buildDeferred", () => {
-  // pipe/compose are ordinary variadic ops here — Fluent's structural
-  // IsVariadic check makes `.pipe` a chain method with no brand needed,
-  // exactly as core's own ops map does it.
+  // pipe/compose carry the `chain` brand here — surfaces route `.pipe`
+  // to the chain wiring, exactly as core's own ops map does it.
   const myOps = { pipe: compose, compose, each };
 
   function myPirell<T>(data: T): BoundWith<typeof myOps, ShapeOf<T>>;

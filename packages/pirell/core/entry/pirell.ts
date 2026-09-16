@@ -2,7 +2,7 @@
 
 import { buildDeferred, buildBound } from "./builders.js";
 import type { ShapeOf } from "../types/codec.js";
-import type { BoundWith } from "../types/assembled.js";
+import type { BoundWith } from "../types/wrapper.js";
 import type { Deferred } from "../types/base.js";
 
 /**

@@ -1,6 +1,6 @@
 // Single definition of surface identity + unwrap; builders and extend
 // agree here.
-import type { OpMap } from "../types/assembled.js";
+import type { OpMap } from "../types/base.js";
 
 /** Marker property identifying a pirell surface. */
 export const SURFACE = "__pirell";
@@ -25,7 +25,4 @@ export type Registration = { readonly [REGISTER]: true; ops: OpMap };
 
 /** Answers whether an op's result is a registration, not data. */
 export const isRegistration = (x: unknown): x is Registration =>
-  x !== null &&
-  x !== undefined &&
-  typeof x === "object" &&
-  REGISTER in x;
+  x !== null && x !== undefined && typeof x === "object" && REGISTER in x;

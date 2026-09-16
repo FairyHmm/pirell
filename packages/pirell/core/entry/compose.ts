@@ -1,31 +1,23 @@
-import type { ComposeChain, ComposeResult, FirstData } from "../types/chain.js";
+import type { Bound, CurrentData, Deferred, OpMap } from "../types/base.js";
+import type { ShapeOf } from "../types/codec.js";
+import type {
+  ComposeChain,
+  ComposeResult,
+  FirstData,
+  Tail,
+} from "../types/chain.js";
+import type { Assembled, SpecialOp } from "../types/wrapper.js";
 import { makeFlat } from "../ops/ops.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- impl-stage call shape: must accept every fn an overload can hand over; unknown's param would reject concrete fns by contravariance
 type Stage = (x: any) => any;
 
-/**
- * Runs functions left to right, returning a reusable pipeline — data
- * is applied later, checked then against the first link's entry claim.
- *
- * ```ts
- * import { compose } from "@pirell/core";
- * import type { Op } from "@pirell/core";
- *
- * type NumberTransform = Op<[["i", number]], [["i", number]]>;
- * const double: NumberTransform = (ns) =>
- *   ns.map((n) => n * 2);
- * const keep: NumberTransform = (ns) =>
- *   ns.filter((n) => n > 2);
- *
- * const run = compose(double, keep);
- * run([1, 2]); // [4]
- * ```
- */
-export function compose<Fns extends unknown[]>(
+// Overloaded pipeline impl (unbranded) — the branded `compose` export
+// (plus its docs) sits below, after the body.
+function composeImpl<Fns extends unknown[]>(
   ...fns: Fns & ComposeChain<Fns>
 ): (data: FirstData<Fns>) => ComposeResult<Fns>;
-export function compose(...fns: Stage[]): (x: unknown) => unknown {
+function composeImpl(...fns: Stage[]): (x: unknown) => unknown {
   // Zero-arg thunk links are applied once to reach their (data) => R
   // stage; data fns already are that stage.
   const stages: Stage[] = fns.map((fn) =>
@@ -51,6 +43,66 @@ export function compose(...fns: Stage[]): (x: unknown) => unknown {
         );
       }
     }, x);
+}
+
+/**
+ * Runs functions left to right, returning a reusable pipeline — data
+ * is applied later, checked then against the first link's entry claim.
+ *
+ * ```ts
+ * import { compose } from "@pirell/core";
+ * import type { Op } from "@pirell/core";
+ *
+ * type NumberTransform = Op<[["i", number]], [["i", number]]>;
+ * const double: NumberTransform = (ns) =>
+ *   ns.map((n) => n * 2);
+ * const keep: NumberTransform = (ns) =>
+ *   ns.filter((n) => n > 2);
+ *
+ * const run = compose(double, keep);
+ * run([1, 2]); // [4]
+ * ```
+ *
+ * Branded `"chain"`: surfaces route this to the chain wiring below.
+ * Type-only — the runtime value is just the impl.
+ */
+export const compose: SpecialOp<"chain", typeof composeImpl> = composeImpl;
+
+type ChainFns<S> = [
+  (arg: CurrentData<S>) => unknown,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- param must accept every fn shape; unknown would reject typed params by contravariance. Return already narrowed to unknown.
+  ...Array<(arg: any) => unknown>,
+];
+
+/**
+ * A chain op's surface method, living with its owner: bound re-binds
+ * to the composed result; deferred append stays deferred.
+ */
+export type ChainMethod<S, Ops extends OpMap = Record<never, never>> =
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- matches any Deferred instantiation
+  S extends Deferred<any>
+    ? {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- deferred chain must accept every fn shape; param any (see ChainFns)
+        <Fns extends Array<(arg: any) => unknown>>(
+          ...fns: Fns
+        ): Assembled<S, Ops>;
+      }
+    : // eslint-disable-next-line @typescript-eslint/no-explicit-any -- matches any Bound instantiation
+      S extends Bound<any>
+      ? {
+          <Fns extends ChainFns<S>>(
+            ...fns: Fns & Tail<Fns, CurrentData<S>>
+          ): Assembled<Bound<ShapeOf<ComposeResult<Fns>>>, Ops>;
+        }
+      : never;
+
+// compose/pipe's entry on the global registry table: the function's
+// wiring paragraph, not a new module.
+declare global {
+  interface PirellSpecialWire<S, Ops extends OpMap> {
+    /** compose/pipe: thread fns, re-wiring siblings onto the result. */
+    chain: ChainMethod<S, Ops>;
+  }
 }
 
 // Data-first view of {@linkcode compose}: same Chain/Result types,
