@@ -40,9 +40,13 @@ export function extend<Ops extends OpMap>(
 // Data-op form only: a factory here would take the data as its argument
 // and return a function. Reject function-typed results at the type level
 // (re-checked at runtime for untyped callers).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- accepts arbitrary user functions; (data: unknown) would reject typed params by contravariance
 export function extend<F extends (data: any) => unknown>(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- detects function-returning functions; must match any signature, unknown would miss typed ones
   fn: F & (ReturnType<F> extends (...args: any[]) => any ? never : unknown),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- single-stage op receives untyped data; the claim is checked at the call, not here
 ): (x: any) => ReturnType<F>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- implementation signature must stay any-compatible with all overloads; unknown would force casts throughout the body
 export function extend(surfaceOrOps: any, ops?: any): any {
   if (ops !== undefined) {
     return applyExtend(surfaceOrOps, ops);
@@ -50,6 +54,7 @@ export function extend(surfaceOrOps: any, ops?: any): any {
   if (typeof surfaceOrOps === "function") {
     // Surfaces are callable functions too — unwrap raw values first,
     // then run the op on them.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- unwraps any surface-or-raw-value; valueOf takes unknown but the binding must accept everything
     return (surfaceOrValue: any) => {
       const raw = valueOf(surfaceOrValue);
       const out = surfaceOrOps(raw);
@@ -61,9 +66,11 @@ export function extend(surfaceOrOps: any, ops?: any): any {
       return out;
     };
   }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- deferred applier accepts any surface; applyExtend validates via isSurface at runtime
   return (surface: any) => applyExtend(surface, surfaceOrOps);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic dispatch over untyped surfaces; isSurface validates inside, return shape varies by branch
 function applyExtend(surface: any, ops: OpMap): any {
   if (!isSurface(surface)) {
     throw new TypeError(
