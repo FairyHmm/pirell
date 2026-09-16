@@ -12,7 +12,7 @@ const orders = [
 
 describe("array methods: lookup", () => {
   it("find returns the first match", () => {
-    expect(pirell(orders).find((o) => o.amount > 3).value).toEqual({
+    expect(pirell(orders).find((o: { amount: number }) => o.amount > 3).value).toEqual({
       status: "paid",
       amount: 5,
     });

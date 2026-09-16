@@ -96,6 +96,7 @@ describe("standalone pipe/compose with pirell Ops", () => {
     // claims [["i", number]] — bridging that seam is an explicit cast,
     // not an inferred continuation (see fixture-ops.ts).
     const entries = toEntries({ a: 1, b: 2 });
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- the documented cross-claim seam (see the test's header comment); raw outputs are the cast-free path, open->closed element claims are explicit
     const flat = flattenEntries(entries) as unknown as Raw<[["i", number]]>;
     const result = double(flat);
     expect(result).toEqual([2, 4]);
@@ -114,8 +115,9 @@ describe("compose/pipe: unchecked spread-array chains fail loudly", () => {
       pipe({ a: 1 }, ...fns);
       expect.unreachable();
     } catch (err) {
+      if (!(err instanceof Error)) throw err;
       expect(err).toBeInstanceOf(Error);
-      expect((err as Error).cause).toBeInstanceOf(TypeError);
+      expect(err.cause).toBeInstanceOf(TypeError);
     }
   });
 

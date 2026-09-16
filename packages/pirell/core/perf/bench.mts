@@ -46,10 +46,7 @@ const CASES: Case[] = [
   {
     name: "arr-wrap",
     headline: true,
-    run: () =>
-      pirell([...SMALL_ARR] as unknown as number[])
-        .extend({ double })
-        .double().value,
+    run: () => pirell([...SMALL_ARR] as number[]).extend({ double }).double().value,
   },
   {
     name: "chain2-direct",
@@ -65,7 +62,7 @@ const CASES: Case[] = [
     name: "chain2-wrap",
     headline: true,
     run: () =>
-      pirell([...SMALL_ARR] as unknown as number[])
+      pirell([...SMALL_ARR] as number[])
         .extend({ double })
         .double()
         .extend({ sumAll })

@@ -26,7 +26,7 @@ describe("standalone extend()", () => {
   });
 
   it("single function works as a pipe step", () => {
-    const fn = extend(double) as (x: any) => any;
+    const fn: (x: unknown) => number[] = extend(double);
     const result = pipe(pirell([1, 2, 3]), fn);
     expect(result).toEqual([2, 4, 6]);
   });

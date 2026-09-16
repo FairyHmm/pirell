@@ -41,11 +41,11 @@ describe("makeCurry: flat (data, ...args) => result → curried", () => {
   it("curries a flat fn that consumes a native op's output", () => {
     // A plain flat fn whose data is the result of a native op still curries
     // cleanly — makeCurry has no op/chain awareness. sumAll's Out is [] (no
-    // shape claim), so its produced value types as unknown; the consumer
-    // narrows it with an explicit cast, which is the op seam, not curry's.
+    // shape claim), so its produced value types as unknown; Number() recovers
+    // the numeric scalar without an assertion, which is the op seam's edge.
     const afterSum = (data: number, label: string) => `${label}:${data}`;
     const curried = makeCurry(afterSum);
-    const total = sumAll([1, 2, 3]) as number;
+    const total = Number(sumAll([1, 2, 3]));
     expect(curried("total")(total)).toBe("total:6");
   });
 });

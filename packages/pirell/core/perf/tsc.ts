@@ -27,21 +27,19 @@ export function tscVersion(): string {
  * return stdout (or stdout+stderr when tsc exits non-zero on errors). */
 export function compile(fileContent: string, extraArgs: string[] = []): string {
   writeFileSync(tmpFile, fileContent);
-  let stdout: string;
   try {
-    stdout = execFileSync(tscBin, ["-p", probeConfig, ...extraArgs], {
+    return execFileSync(tscBin, ["-p", probeConfig, ...extraArgs], {
       cwd: coreDir,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
     });
   } catch (err) {
     // tsc exits non-zero on type errors — the caller still needs the text.
-    const e = err as { stdout?: unknown; stderr?: unknown };
-    const out = typeof e.stdout === "string" ? e.stdout : "";
-    const errText = typeof e.stderr === "string" ? e.stderr : "";
-    stdout = out + errText;
+    const e = typeof err === "object" && err !== null ? err : {};
+    const stdout = "stdout" in e && typeof e.stdout === "string" ? e.stdout : "";
+    const errText = "stderr" in e && typeof e.stderr === "string" ? e.stderr : "";
+    return stdout + errText;
   }
-  return stdout;
 }
 
 export function cleanup(): void {

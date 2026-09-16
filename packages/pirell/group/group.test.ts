@@ -126,8 +126,8 @@ describe("each", () => {
   it("re-wires onto a groupMethod result", () => {
     const result = pirell(orders)
       .groupBy("status")
-      .each((rows: unknown[]) =>
-        [...(rows as { amount: number }[])].sort((a, b) => a.amount - b.amount),
+      .each((rows: { amount: number }[]) =>
+        [...rows].sort((a, b) => a.amount - b.amount),
       )
       .values().value;
     expect(result).toEqual([

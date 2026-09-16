@@ -4,14 +4,15 @@ import { length } from "./array.js";
 
 describe("array methods: fold", () => {
   it("reduce folds with and without an initializer", () => {
-    expect(pirell([1, 2, 3]).reduce((a, b) => a + b, 0).value).toBe(6);
-    expect(pirell([1, 2, 3]).reduce((a, b) => a + b).value).toBe(6);
+    expect(pirell([1, 2, 3]).reduce((a: number, b: number) => a + b, 0).value).toBe(6);
+    expect(pirell([1, 2, 3]).reduce((a: number, b: number) => a + b).value).toBe(6);
   });
 
   it("reduceRight folds right-to-left", () => {
-    expect(pirell(["a", "b", "c"]).reduceRight((acc, v) => acc + v).value).toBe(
-      "cba",
-    );
+    expect(
+      pirell(["a", "b", "c"]).reduceRight((acc: string, v: string) => acc + v)
+        .value,
+    ).toBe("cba");
   });
 });
 

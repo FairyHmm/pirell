@@ -78,6 +78,7 @@ describe("type inference through chains", () => {
     // values is Raw<["i"]> (flattenEntries doesn't inspect value type — see
     // fixture-ops.ts) — double now claims element type, so bridging the
     // seam is an explicit, honest cast, not an inferred continuation.
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- open->closed element seam (see above)
     const doubled = double(values as unknown as Raw<[["i", number]]>);
     expect(doubled).toEqual([20, 40, 60]);
   });
@@ -86,6 +87,7 @@ describe("type inference through chains", () => {
     const obj = { p: 5, q: 10 };
     const pairs = toEntries(obj);
     const values = flattenEntries(pairs);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- open->closed element seam (same as above)
     const doubled = double(values as unknown as Raw<[["i", number]]>);
     expect(doubled).toEqual([10, 20]);
   });

@@ -93,10 +93,12 @@ describe("splitting a chain in two (value reuse)", () => {
     const oneLine = entry([1, 2, 3]).double().sumAll();
 
     const res1 = entry([1, 2, 3]).double();
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- the FINDING's value-reuse probe refuses to typecheck (TS2349 at 96); the lint flags are consequences of the deliberately-broken code, to dissolve with the escape hatch
     const split = entry(res1).sumAll();
 
     expect(oneLine.value).toBe(12);
     expect(res1.value).toEqual([2, 4, 6]);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access -- reads the FINDING probe's unresolved .value (see above)
     expect(split.value).toBe(12);
   });
 });

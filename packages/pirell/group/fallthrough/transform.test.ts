@@ -11,6 +11,8 @@ const orders = [
   { status: "unpaid", amount: 2 },
 ];
 
+type Order = (typeof orders)[number];
+
 describe("array methods: transform", () => {
   it("map transforms values and rewraps as an open column", () => {
     const result = pirell([1, 2, 3]).map((n) => n * 2);
@@ -18,7 +20,7 @@ describe("array methods: transform", () => {
   });
 
   it("map over table rows keeps the rows indexed", () => {
-    const result = pirell(orders).map((o) => ({ ...o, amount: o.amount * 2 }));
+    const result = pirell(orders).map((o: Order) => ({ ...o, amount: o.amount * 2 }));
     expect(result.value).toEqual([
       { status: "paid", amount: 10 },
       { status: "paid", amount: 14 },
@@ -27,7 +29,7 @@ describe("array methods: transform", () => {
   });
 
   it("filter keeps matching rows", () => {
-    const result = pirell(orders).filter((o) => o.amount > 3);
+    const result = pirell(orders).filter((o: Order) => o.amount > 3);
     expect(result.value).toEqual([
       { status: "paid", amount: 5 },
       { status: "paid", amount: 7 },
@@ -42,7 +44,7 @@ describe("array methods: transform", () => {
   });
 
   it("sort accepts a comparator", () => {
-    const result = pirell(orders).sort((a, b) => b.amount - a.amount);
+    const result = pirell(orders).sort((a: Order, b: Order) => b.amount - a.amount);
     expect(result.value).toEqual([
       { status: "paid", amount: 7 },
       { status: "paid", amount: 5 },
@@ -66,7 +68,7 @@ describe("array methods: transform", () => {
   });
 
   it("flatMap maps then flattens one level", () => {
-    const result = pirell([1, 2, 3]).flatMap((n) => [n, n]);
+    const result = pirell([1, 2, 3]).flatMap((n: number) => [n, n]);
     expect(result.value).toEqual([1, 1, 2, 2, 3, 3]);
   });
 
