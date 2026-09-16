@@ -32,11 +32,11 @@ export const groupBy =
     // verified to match this op's prior manual-loop behavior). The
     // convenience layer is just the field-name/key-fn shorthand below;
     // the grouping itself is the native engine's job.
-    Object.groupBy(data, (row) =>
-      // Seam: the op holds shape-described rows; the fn holds caller
-      // rows. The caller promised the projection fits their data.
-      String(typeof key === "function" ? key(row as R) : row[key]),
-    ) as Record<string, Record<string, unknown>[]>;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- groupBy yields every input row under some key; the Partial record fully materializes, so the claim is the op's real contract
+    Object.groupBy(data, project(key)) as Record<
+      string,
+      Record<string, unknown>[]
+    >;
 
 /**
  * Indexes a table into a record of single rows, keyed by a field
@@ -57,13 +57,23 @@ export const groupBy =
 export const indexBy =
   <R>(key: GroupKey<R>): Op<Table, ["k", ...Row]> =>
   (data) => {
+    // Same null-prototype result as native groupBy; own-key safe.
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- Object.create(null) is lib-typed any; the claim captures the real shape
     const out = Object.create(null) as Record<string, Record<string, unknown>>;
-    for (const row of data) {
-      const k = typeof key === "function" ? key(row as R) : row[key];
-      out[String(k)] = row;
-    }
+    const dispose = project(key);
+    for (const row of data) out[dispose(row)] = row;
     return out;
   };
+
+// Seam: the op holds shape-described rows; the public key() is the
+// caller's projection over their own row type. The caller promised the
+// projection fits their data, so the claim below is the contract.
+const project = <R>(
+  key: GroupKey<R>,
+): ((row: Record<string, unknown>) => string) =>
+  (row) =>
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- the caller-owned row contract (see seam comment)
+    String(typeof key === "function" ? key(row as R) : row[key]);
 
 /**Grouping ops, as data for `extend`. */
 export const groupingMethods = { groupBy, indexBy };

@@ -56,8 +56,12 @@ export const fromEntries: Op<Pairs, ["k"]> = Object.fromEntries;
  */
 export const assign =
   (...sources: Record<string, unknown>[]): Op<Keyed, Keyed> =>
-  (data) =>
-    Object.assign({}, data, ...sources);
+  (data) => {
+    // No Object.assign(...sources) — its rest overload returns any.
+    const out: Record<string, unknown> = { ...data };
+    for (const src of sources) Object.assign(out, src);
+    return out;
+  };
 
 /**
  * Answers key presence — a terminal probe, scalar result, no rewrap

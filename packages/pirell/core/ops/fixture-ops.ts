@@ -15,8 +15,13 @@ export const sumAll: Op<[["i", number]], []> = (data) =>
 export const toEntries: Op<["k"], ["i", "i..."]> = (data) =>
   Object.entries(data);
 
-export const entriesToObject: Op<["i", "i..."], ["k"]> = (data) =>
-  Object.fromEntries(data);
+export const entriesToObject: Op<["i", "i..."], ["k"]> = (data) => {
+  // Rows are open (unknown[] per the "i..." claim); their first cell is
+  // keyed by pair construction (see toEntries), so String() recovers it.
+  const out: Record<string, unknown> = {};
+  for (const row of data) out[String(row[0])] = row[1];
+  return out;
+};
 
 // Inner arrays carry Branch number through to a uniform Record<string, number>.
 export const sumValues: Op<["k", ["i", number], "..."], [["k", number]]> = (
@@ -56,4 +61,4 @@ export const take =
 // Open-shape op for transition chains (closed `double` can't accept
 // the unknown[] flowing out of flattenEntries).
 export const doubleOpen: Op<["i", "..."], ["i", "..."]> = (ns) =>
-  (ns as number[]).map((n) => n * 2);
+  ns.map((n) => Number(n) * 2);
