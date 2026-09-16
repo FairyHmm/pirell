@@ -64,8 +64,8 @@ export const filter =
 export const sort =
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- comparand type is caller-supplied, see doc comment above
   (compare?: (a: any, b: any) => number): Rewrap =>
-  (data) =>
-    data.toSorted(compare);
+    (data) =>
+      data.toSorted(compare);
 
 /**
  * Takes a subrange.
@@ -284,10 +284,7 @@ export const length: Terminal = (data) => data.length;
  * at all (native `reduce` treats explicit-`undefined` differently).
  */
 export const reduce =
-  (
-    reducer: FoldCallback,
-    ...rest: [initial?: unknown]
-  ): Terminal =>
+  (reducer: FoldCallback, ...rest: [initial?: unknown]): Terminal =>
   (data) => {
     // Omitted vs explicit-undefined init differ in native reduce — keep
     // the no-init form forwarding no second argument at all.
@@ -305,15 +302,11 @@ export const reduce =
  * @param initial Seed; when omitted, no second argument is forwarded.
  */
 export const reduceRight =
-  (
-    reducer: FoldCallback,
-    ...rest: [initial?: unknown]
-  ): Terminal =>
+  (reducer: FoldCallback, ...rest: [initial?: unknown]): Terminal =>
   (data) => {
     // Omitted vs explicit-undefined init differ natively here too.
     return rest.length === 0
-      ? // eslint-disable-next-line sonarjs/reduce-initial-value -- no-init is deliberate, see reduce's comment
-        data.reduceRight(reducer)
+      ? data.reduceRight(reducer)
       : data.reduceRight(reducer, rest[0]);
   };
 
