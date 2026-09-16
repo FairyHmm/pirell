@@ -25,6 +25,8 @@ type Flatten<F> = F extends (...args: infer A) => (data: infer Data) => infer R
  * `(data, ...args) => result`. Shape-agnostic, like
  * {@linkcode makeCurry} in reverse.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- accepts any curried fn; a unknown[] constraint would reject compose's overload and concrete factories by variance
 export function makeFlat<F extends (...args: any) => any>(fn: F): Flatten<F> {
-  return ((data: any, ...args: any[]) => fn(...args)(data)) as Flatten<F>;
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call -- Flatten can't walk composed signatures (see pipe's doc), and fn's constraint return is any to allow the double call; the cast is the stamp of that single unchecked step
+  return ((data: unknown, ...args: unknown[]) => fn(...args)(data)) as Flatten<F>;
 }

@@ -28,8 +28,8 @@ export function compose<Fns extends unknown[]>(
 export function compose(...fns: Stage[]): (x: unknown) => unknown {
   // Zero-arg thunk links are applied once to reach their (data) => R
   // stage; data fns already are that stage.
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- fn.length === 0 is the only checkable sign of a thunk; dropping the required param is inherent to calling it
   const stages: Stage[] = fns.map((fn) =>
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- fn.length === 0 is the only checkable sign of a thunk; dropping the required param is inherent to calling it
     fn.length === 0 ? (fn as () => Stage)() : fn,
   );
   return (x: unknown) =>
@@ -83,6 +83,6 @@ type PipeFn = <Fns extends unknown[]>(
  * version of the same unchecked assertion; runtime correctness is
  * covered by `compose.test.ts`'s `pipe` suite instead.
  */
-export const pipe: PipeFn =
+export const pipe =
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- documented below: Flatten can't walk compose's overload, so the single as (not as unknown as) is the honest unchecked assertion
   makeFlat(compose) as PipeFn;

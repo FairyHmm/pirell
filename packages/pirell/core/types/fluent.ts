@@ -79,8 +79,8 @@ export type Fluent<F extends OpLike, S, Ops extends OpMap = Record<never, never>
     ? <O2 extends OpMap>(ops: O2) => ExtendResult<S, O2 & Ops>
     : IsVariadic<F> extends true
       ? ChainMethod<S, Ops>
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- distinguishes 'factory returning a fn' from 'factory returning data'; only aliased ops arrive here and their param is set by the user, so the referent must be any
       : F extends (...args: infer A) => infer R
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- distinguishes 'factory returning a fn' from 'factory returning data'; only aliased ops arrive here and their param is set by the user, so the referent must be any
         ? R extends (data: any) => any
           ? // Ordinary factory: apply the args, then match its claim
             // against the surface's shape.
