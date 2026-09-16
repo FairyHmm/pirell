@@ -28,6 +28,13 @@ export type Terminal = Op<Indexed, []>;
 export type ArrayCallback = (row: any, index: number) => any;
 
 /**
+ * Fold over elements. Acc/value types are caller-supplied; the shape
+ * claim stays the library's business, so `unknown` can't narrow them.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- acc/value types are caller-supplied, see doc comment above
+export type FoldCallback = (acc: any, value: any, index: number) => any;
+
+/**
  * Transforms each element, staying an open column.
  *
  * @param fn Produces each output element from `(row, index)`.
@@ -278,14 +285,15 @@ export const length: Terminal = (data) => data.length;
  */
 export const reduce =
   (
-    reducer: (acc: any, value: any, index: number) => any,
-    ...rest: [initial?: any]
+    reducer: FoldCallback,
+    ...rest: [initial?: unknown]
   ): Terminal =>
   (data) => {
     // Omitted vs explicit-undefined init differ in native reduce — keep
     // the no-init form forwarding no second argument at all.
     return rest.length === 0
-      ? data.reduce(reducer)
+      ? // eslint-disable-next-line sonarjs/reduce-initial-value -- no-init is deliberate: forwarding an undefined seed changes native reduce's behavior, see comment above
+        data.reduce(reducer)
       : data.reduce(reducer, rest[0]);
   };
 
@@ -298,12 +306,14 @@ export const reduce =
  */
 export const reduceRight =
   (
-    reducer: (acc: any, value: any, index: number) => any,
-    ...rest: [initial?: any]
+    reducer: FoldCallback,
+    ...rest: [initial?: unknown]
   ): Terminal =>
   (data) => {
+    // Omitted vs explicit-undefined init differ natively here too.
     return rest.length === 0
-      ? data.reduceRight(reducer)
+      ? // eslint-disable-next-line sonarjs/reduce-initial-value -- no-init is deliberate, see reduce's comment
+        data.reduceRight(reducer)
       : data.reduceRight(reducer, rest[0]);
   };
 
