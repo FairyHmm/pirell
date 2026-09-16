@@ -21,11 +21,9 @@ export { extend, type Extended } from "./entry/extend.js";
 export { buildBound, buildDeferred } from "./entry/builders.js";
 export { makeFlat, makeCurry } from "./ops/ops.js";
 export { SURFACE, isSurface, valueOf } from "./entry/surface.js";
-export { each } from "./entry/each.js";
 
 import { pirell as pirellRaw } from "./entry/pirell.js";
 import { compose } from "./entry/compose.js";
-import { each } from "./entry/each.js";
 import { extend, extendOp, type Extended } from "./entry/extend.js";
 
 // Everything `pirell` offers, seeded via extend like any package's own
@@ -34,7 +32,6 @@ import { extend, extendOp, type Extended } from "./entry/extend.js";
 export const coreOps = {
   pipe: compose,
   compose,
-  each,
   extend: extendOp,
 };
 

@@ -1,8 +1,6 @@
-import { isSurface, valueOf } from "./surface.js";
-import type { Op } from "../types/base.js";
-
-/** Shape claim for keyed (record) data. */
-export type Keyed = ["k", "..."];
+import { isSurface, valueOf } from "@pirell/core";
+import type { Op } from "@pirell/core";
+import type { Keyed } from "../fallthrough/object.js";
 
 /**
  * Broadcasts an op across every value of a keyed record, rebuilding

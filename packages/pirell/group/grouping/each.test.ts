@@ -1,9 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { pirell } from "../index.js";
 import { each } from "./each.js";
-import { pipe } from "./compose.js";
-import { double } from "../ops/fixture-ops.js";
-import type { Op } from "../types/base.js";
+import { pipe } from "@pirell/core";
+import type { Op } from "@pirell/core";
+
+// Test-local double — mirrors core's fixture op without reaching into
+// core's private ops dir.
+const double: Op<[["i", number]], [["i", number]]> = (data) =>
+  data.map((n) => n * 2);
 
 // A sibling Keyed → Indexed op, mirroring a package's `values`: claims
 // open-keyed input so it re-wires onto `each`'s output shape.
@@ -17,7 +21,7 @@ describe("each", () => {
   });
 
   it("chains: sibling ops re-wire onto the keyed result", () => {
-    // `each` is already a core op on pirell() — only listValues is new.
+    // `each` is already a group op on pirell() — only listValues is new.
     const values = pirell({ a: [3, 1], b: [2] })
       .extend({ listValues })
       .each(double)

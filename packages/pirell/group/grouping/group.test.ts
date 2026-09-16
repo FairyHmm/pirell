@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { pipe } from "@pirell/core";
 import { groupBy, indexBy } from "./groups.js";
-import { pirell } from "./index.js";
+import { pirell } from "../index.js";
 
 // Domain data, bare — array-of-objects derives a Table-compatible
 // shape, so fixtures need no annotations and no seam casts. Key

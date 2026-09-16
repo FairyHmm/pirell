@@ -1,6 +1,7 @@
 /**
- * Grouped data pipelines: {@linkcode pirell} bound with grouping plus
- * the native `Array`/`Object` fallthroughs.
+ * Grouped data pipelines: {@linkcode pirell} bound with grouping, the
+ * `each` broadcast combinator, plus the native `Array`/`Object`
+ * fallthroughs.
  *
  * ```ts
  * import { pirell } from "@pirell/group";
@@ -15,30 +16,33 @@
  * ```
  *
  * Method sets live in {@linkcode groupMethods} (`groupingMethods` +
- * `arrayFallthroughMethods` + `objectFallthroughMethods`); every op is
+ * `each` + `arrayFallthroughMethods` + `objectFallthroughMethods`); every op is
  * also exported standalone for `pipe` from `@pirell/core`.
  *
  * @module
  */
 import { pirell as pirellRaw } from "@pirell/core";
 import type { CoreOps, Extended } from "@pirell/core";
-import { groupingMethods } from "./groups.js";
+import { groupingMethods } from "./grouping/groups.js";
 import { arrayFallthroughMethods } from "./fallthrough/array.js";
 import { objectFallthroughMethods } from "./fallthrough/object.js";
+import { each } from "./grouping/each.js";
 
-export * from "./groups.js";
+export * from "./grouping/groups.js";
+export * from "./grouping/each.js";
 export * from "./fallthrough/array.js";
 export * from "./fallthrough/object.js";
 
 /**
- * Every op on the surface, as data for `extend`: grouping plus the
- * array/object fallthroughs. Spread in your own ops to compose a
- * custom API — see {@linkcode Extended}.
+ * Every op on the surface, as data for `extend`: grouping plus `each`
+ * plus the array/object fallthroughs. Spread in your own ops to
+ * compose a custom API — see {@linkcode Extended}.
  */
 export const groupMethods = {
   ...groupingMethods,
   ...arrayFallthroughMethods,
   ...objectFallthroughMethods,
+  each,
 };
 /** The ops map behind {@linkcode pirell}, as a type for composition. */
 export type GroupOps = typeof groupMethods;

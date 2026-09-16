@@ -9,7 +9,6 @@ import {
   buildBound,
   buildDeferred,
   compose,
-  each,
 } from "../index.js";
 
 // Bodies are factories returning data fns; the claim() narrows the
@@ -92,7 +91,7 @@ describe("recreating the library through the public API", () => {
 describe("recreating pirell() itself from buildBound/buildDeferred", () => {
   // pipe/compose carry the `chain` brand here — surfaces route `.pipe`
   // to the chain wiring, exactly as core's own ops map does it.
-  const myOps = { pipe: compose, compose, each };
+  const myOps = { pipe: compose, compose };
 
   function myPirell<T>(data: T): BoundWith<typeof myOps, ShapeOf<T>>;
   function myPirell(): Extended<typeof myOps>;
