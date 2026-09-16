@@ -40,12 +40,18 @@ export type ResolvedOpsDeferred<
 
 /** The surface an op application lands on: a deferred surface stays deferred (no data to gate yet — its calls bind `T` and validate claims at bind time), a bound one collapses to the result. */
 export type OpResultSurface<S, Out extends Shape, Ops extends OpMap> =
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- matches any Deferred instantiation; Deferred<Shape> misses narrower outputs (covariant Bound return)
   S extends Deferred<any> ? ResolvedOpsDeferred<Out, Ops> : Bound<Out>;
 
-type ChainFns<S> = [(arg: CurrentData<S>) => any, ...Array<(arg: any) => any>];
+type ChainFns<S> = [
+  (arg: CurrentData<S>) => unknown,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- param must accept every fn shape; unknown would reject typed params by contravariance. Return already narrowed to unknown.
+  ...Array<(arg: any) => unknown>,
+];
 
 /** What `surface.extend(ops)` returns — named once for publishers. */
 export type ExtendResult<S, Ops extends OpMap> =
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- see OpResultSurface
   S extends Deferred<any>
     ? IsUnion<keyof Ops> extends true
       ? Assembled<
@@ -56,8 +62,10 @@ export type ExtendResult<S, Ops extends OpMap> =
         > & { (): ExtendResult<S, Ops> }
       : keyof Ops extends infer K extends keyof Ops
         ? Ops[K] extends
-            | Op<any, infer Out extends Shape>
-            | ((...args: any[]) => Op<any, infer Out extends Shape>)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- extracts each op's Out by call-shape matching; Op<Shape,...> fails concrete instantiations (covariant return), so any stays
+          | Op<any, infer Out extends Shape>
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- factory arm: (...args: unknown[]) would reject curried op factories
+          | ((...args: any[]) => Op<any, infer Out extends Shape>)
           ? Assembled<OpResultSurface<S, Out, Ops>, Ops> & {
               (): ExtendResult<S, Ops>;
             }
@@ -92,11 +100,17 @@ export type BoundWith<Ops extends OpMap, Out extends Shape> = Assembled<
 >;
 
 /** A chain op's surface method: bound surfaces re-bind to the composed result; deferred append stays deferred (nothing to gate on yet — its calls bind any `T` and validate claims then). */
-export type ChainMethod<S, Ops extends OpMap = {}> =
+export type ChainMethod<S, Ops extends OpMap = Record<never, never>> =
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- matches any Deferred instantiation (see OpResultSurface)
   S extends Deferred<any>
     ? {
-        <Fns extends Array<(arg: any) => any>>(...fns: Fns): Assembled<S, Ops>;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- deferred chain must accept every fn shape; param any (see ChainFns)
+        <Fns extends Array<(arg: any) => unknown>>(...fns: Fns): Assembled<
+          S,
+          Ops
+        >;
       }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- matches any Bound instantiation (see OpResultSurface)
     : S extends Bound<any>
       ? {
           <Fns extends ChainFns<S>>(
@@ -106,4 +120,8 @@ export type ChainMethod<S, Ops extends OpMap = {}> =
       : never;
 
 /** The decorated surface: its ops map wired as callable methods, plus the data (shape `S`). */
-export type Assembled<S, Ops extends OpMap = {}> = OpMethods<Ops, S> & S;
+export type Assembled<S, Ops extends OpMap = Record<never, never>> = OpMethods<
+  Ops,
+  S
+> &
+  S;
