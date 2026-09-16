@@ -48,13 +48,16 @@ type SurfaceSpec = {
 // compile-time coverage. No name is privileged — `ops: {}` yields zero
 // methods, `extend` included (the free `extend(surface, ops)` function
 // bootstraps a bare surface directly).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Proxy erases the Bound/Deferred distinction; buildBound/buildDeferred re-type on return
 function buildSurface(ops: OpMap, spec: SurfaceSpec): any {
-  const target: any = spec.invoke;
-  const handler: ProxyHandler<any> = {
+  const target: SurfaceSpec["invoke"] = spec.invoke;
+  const handler: ProxyHandler<SurfaceSpec["invoke"]> = {
     get(t, prop, receiver) {
       if (prop === SURFACE) return true;
       if (prop === "value") return spec.getValue();
-      if (typeof prop !== "string") return Reflect.get(t, prop, receiver);
+      if (typeof prop !== "string") {
+        return Reflect.get(t, prop, receiver) as unknown;
+      }
       const op = ops[prop];
       if (op === undefined) return undefined;
       return (...args: unknown[]) => {
@@ -76,7 +79,9 @@ function buildSurface(ops: OpMap, spec: SurfaceSpec): any {
 }
 
 // A Registration result grows the table instead of wrapping as data.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- shape unknown at build time; re-proven by Fluent's typed pirell() claims, never read here
 export function buildBound(value: unknown, ops: OpMap): Assembled<Bound<any>> {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- the proxy's callable+method-table shape reloads only through the declared surface type
   return buildSurface(ops, {
     invoke: (input) => buildBound(valueOf(input), ops),
     getValue: () => value,
@@ -92,7 +97,9 @@ export function buildBound(value: unknown, ops: OpMap): Assembled<Bound<any>> {
 export function buildDeferred(
   steps: Array<(data: unknown) => unknown>,
   ops: OpMap,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- deferred shape unknown at build time; re-claimed by pirell()'s typed facade, never read here
 ): Assembled<Deferred<any>> {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- see buildBound
   return buildSurface(ops, {
     invoke: (input) =>
       buildBound(
