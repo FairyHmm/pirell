@@ -4,6 +4,7 @@ import type { Op, Raw, Shape } from "./base.js";
 
 // A zero-arg fn returning a fn is a curried Op-shaped link, matched by
 // call shape alone (mirrors compose's runtime `fn.length === 0` check).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- match any returned data fn; unknown's param would reject concrete factories by contravariance
 type IsThunk<F> = F extends () => (data: any) => any ? true : false;
 
 // Non-tuple arrays (length number) can't recurse tuple-style — map instead.
@@ -16,16 +17,21 @@ type IsTuple<Fns extends readonly unknown[]> = number extends Fns["length"]
 // empty-chain leak.
 type ChainResult<F> =
   IsThunk<F> extends true
-    ? F extends Op<any, infer LOut extends Shape>
+    ? // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Op's In is Shape-constrained; any matches every instantiation, only Out is read
+      F extends Op<any, infer LOut extends Shape>
       ? Raw<LOut>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- match any data-fn return to infer R; unknown's param rejects concrete fns
       : F extends () => (data: any) => infer R
         ? R
         : never
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- match any fn to infer its return; unknown rejects typed params
     : F extends (arg: any) => infer R
       ? R
       : never;
 
-type ChainEntry<F> = F extends Op<infer FIn extends Shape, any> ? FIn : ["..."];
+type ChainEntry<F> =
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Op's second param is Shape-constrained, so any is the only permissive filler; only FIn is wanted
+  F extends Op<infer FIn extends Shape, any> ? FIn : ["..."];
 
 type ChainEnds<Fns extends readonly unknown[]> =
   ComposeChain<Fns> extends [infer Only]
@@ -39,11 +45,13 @@ type ChainEnds<Fns extends readonly unknown[]> =
 export type FirstData<Fns extends readonly unknown[]> =
   Fns extends [infer F, ...unknown[]]
     ? IsThunk<F> extends true
-      ? F extends (...args: any[]) => (data: infer D0) => any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- thunk factories take optional args; unknown[] rest would reject single-param data-returning factories
+      ? F extends (...args: any[]) => (data: infer D0) => unknown
         ? D0
         : unknown
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Op's second param is Shape-constrained; any is the only permissive filler, it's deliberately unread
       : F extends Op<infer _FIn extends Shape, any>
-        ? F extends (data: infer D0) => any
+        ? F extends (data: infer D0) => unknown
           ? D0
           : unknown
         : unknown
@@ -56,7 +64,8 @@ export type FirstData<Fns extends readonly unknown[]> =
 // param/return — no Op decomposition or DataOf/Raw rebuild per link.
 type Step<F, Cur> =
   IsThunk<F> extends true
-    ? F extends (...args: any[]) => (data: infer D0) => infer R0
+    ? // eslint-disable-next-line @typescript-eslint/no-explicit-any -- same factory-call-shape match as FirstData
+      F extends (...args: any[]) => (data: infer D0) => infer R0
       ? Cur extends D0
         ? { ok: true; r: R0; l: F }
         : { ok: false }
@@ -92,6 +101,7 @@ export type ComposeChain<Fns extends readonly unknown[]> =
   IsTuple<Fns> extends true
     ? Fns extends [infer F, ...infer Rest]
       ? IsThunk<F> extends true
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- thunk's data fn is matched bare (data never read, only R); arg-any accepts every factory
         ? F extends (...args: any[]) => (data: any) => infer R
           ? [F, ...Tail<Rest, R>]
           : never
