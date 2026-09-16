@@ -58,7 +58,7 @@ type OutOf<RD> = [unknown] extends [RD]
 // tuple. Fixed-arity signatures — including zero-arg factories like
 // `() => (data) => R`, whose own arg tuple is the fixed `[]`, not an
 // open `unknown[]` — reject the probe tuple and resolve false.
-type IsVariadic<F> = F extends (...args: infer A) => any
+type IsVariadic<F> = F extends (...args: infer A) => unknown
   ? [string, number] extends A
     ? true
     : false
@@ -71,13 +71,15 @@ type IsVariadic<F> = F extends (...args: infer A) => any
  * and the failure arm sits outside the arrow so a mismatched call
  * itself is uncallable (TS2349).
  */
-export type Fluent<F extends OpLike, S, Ops extends OpMap = {}> =
+export type Fluent<F extends OpLike, S, Ops extends OpMap = Record<never, never>> =
   // Registering op (extend): grows the existing table — merge
   // `{ ...ops, ...result.ops }`, same semantics as runtime.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- matches only the extend-body's (data) stage; data must be untyped because it's never read, and unknown's param would reject the registered unknown-param claim on the referent side of variance
   F extends (ops: infer _O extends OpMap) => (data: any) => Registration
     ? <O2 extends OpMap>(ops: O2) => ExtendResult<S, O2 & Ops>
     : IsVariadic<F> extends true
       ? ChainMethod<S, Ops>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- distinguishes 'factory returning a fn' from 'factory returning data'; only aliased ops arrive here and their param is set by the user, so the referent must be any
       : F extends (...args: infer A) => infer R
         ? R extends (data: any) => any
           ? // Ordinary factory: apply the args, then match its claim
@@ -92,13 +94,15 @@ export type Fluent<F extends OpLike, S, Ops extends OpMap = {}> =
  */
 type FactoryPath<A extends unknown[], R, S, Ops extends OpMap> =
   R extends Op<infer FIn extends Shape, infer FOut extends Shape>
-    ? S extends Deferred<any>
+    ? // eslint-disable-next-line @typescript-eslint/no-explicit-any -- matches any Deferred instantiation (see OpResultSurface)
+      S extends Deferred<any>
       ? (...args: A) => Assembled<OpResultSurface<S, FOut, Ops>, Ops>
       : MatchShape<FIn, CurrentShp<S>> extends true
         ? (...args: A) => Assembled<OpResultSurface<S, FOut, Ops>, Ops>
         : ShapeMismatch<FIn, CurrentShp<S>>
     : R extends (data: infer D) => infer RD
-      ? S extends Deferred<any>
+      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any -- matches any Deferred instantiation (see OpResultSurface)
+        S extends Deferred<any>
         ? (...args: A) => Assembled<OpResultSurface<S, OutOf<RD>, Ops>, Ops>
         : [ClaimOf<D>] extends [never]
           ? ShapeMismatch<never, CurrentShp<S>>
@@ -110,13 +114,15 @@ type FactoryPath<A extends unknown[], R, S, Ops extends OpMap> =
 /** A data op as a whole function (direct Op or aliased one). */
 type DirectOpPath<F, S, Ops extends OpMap> =
   F extends Op<infer In extends Shape, infer Out extends Shape>
-    ? S extends Deferred<any>
+    ? // eslint-disable-next-line @typescript-eslint/no-explicit-any -- matches any Deferred instantiation (see OpResultSurface)
+      S extends Deferred<any>
       ? () => Assembled<OpResultSurface<S, Out, Ops>, Ops>
       : MatchShape<In, CurrentShp<S>> extends true
         ? () => Assembled<OpResultSurface<S, Out, Ops>, Ops>
         : ShapeMismatch<In, CurrentShp<S>>
-    : F extends (data: infer D2) => any
-      ? S extends Deferred<any>
+    : F extends (data: infer D2) => unknown
+      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any -- matches any Deferred instantiation (see OpResultSurface)
+        S extends Deferred<any>
         ? () => Assembled<OpResultSurface<S, [], Ops>, Ops>
         : [ClaimOf<D2>] extends [never]
           ? ShapeMismatch<never, CurrentShp<S>>
