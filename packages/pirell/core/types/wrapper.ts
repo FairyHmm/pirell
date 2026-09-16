@@ -76,12 +76,19 @@ export type SpecialOp<K extends string, F> = F & {
   readonly __fluent?: K;
 };
 
-// Brand lookup via plain index — never infer-match the op's own
-// signatures (their generics can't take the caller's S/Ops).
+// Brand lookup: ordinary ops carry no brand (`unknown`) and resolve
+// without touching the registry at all; only a carried brand reaches
+// the lookup, so future brands stay open with no per-op cost today.
+// Never infer-match the op's own signatures (their generics can't take
+// the caller's S/Ops).
 type BrandOf<F, S, Ops extends OpMap> = F extends {
-  readonly __fluent?: infer K extends keyof SpecialWire<S, Ops>;
+  readonly __fluent?: infer K;
 }
-  ? SpecialWire<S, Ops>[K]
+  ? [unknown] extends [K]
+    ? never
+    : K extends keyof SpecialWire<S, Ops>
+      ? SpecialWire<S, Ops>[K]
+      : never
   : never;
 
 /**
@@ -98,7 +105,7 @@ export type Fluent<
 > =
   // Branded special op: wiring comes from the open registry — one arm
   // for every special op, present or future.
-  [BrandOf<F, S, Ops>] extends [never]
+  BrandOf<F, S, Ops> extends never
     ? F extends (...args: infer A) => infer R
       ? // eslint-disable-next-line @typescript-eslint/no-explicit-any -- distinguishes 'factory returning a fn' from 'factory returning data'; only aliased ops arrive here and their param is set by the user, so the referent must be any
         R extends (data: any) => any
@@ -111,18 +118,12 @@ export type Fluent<
 
 // One call's landing, shared by every ordinary arm: deferred rewires
 // without gating; bound checks the claim, fail-closed outside the arrow.
-type Land<
-  In extends Shape,
-  S,
-  Out extends Shape,
-  Ops extends OpMap,
-  Args extends unknown[],
-> =
+type Land<In extends Shape, S, Call> =
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- matches any Deferred instantiation (see OpResultSurface)
   S extends Deferred<any>
-    ? (...args: Args) => Assembled<OpResultSurface<S, Out, Ops>, Ops>
+    ? Call
     : MatchShape<In, CurrentShp<S>> extends true
-      ? (...args: Args) => Assembled<OpResultSurface<S, Out, Ops>, Ops>
+      ? Call
       : ShapeMismatch<In, CurrentShp<S>>;
 
 /**
@@ -131,21 +132,29 @@ type Land<
  */
 type FactoryPath<A extends unknown[], R, S, Ops extends OpMap> =
   R extends Op<infer FIn extends Shape, infer FOut extends Shape>
-    ? Land<FIn, S, FOut, Ops, A>
+    ? Land<
+        FIn,
+        S,
+        (...args: A) => Assembled<OpResultSurface<S, FOut, Ops>, Ops>
+      >
     : R extends (data: infer D) => infer RD
       ? [ClaimOf<D>] extends [never]
         ? ShapeMismatch<never, CurrentShp<S>>
-        : Land<ClaimOf<D>, S, OutOf<RD>, Ops, A>
+        : Land<
+            ClaimOf<D>,
+            S,
+            (...args: A) => Assembled<OpResultSurface<S, OutOf<RD>, Ops>, Ops>
+          >
       : never;
 
 /** A data op as a whole function (direct Op or aliased one). */
 type DirectOpPath<F, S, Ops extends OpMap> =
   F extends Op<infer In extends Shape, infer Out extends Shape>
-    ? Land<In, S, Out, Ops, []>
+    ? Land<In, S, () => Assembled<OpResultSurface<S, Out, Ops>, Ops>>
     : F extends (data: infer D2) => unknown
       ? [ClaimOf<D2>] extends [never]
         ? ShapeMismatch<never, CurrentShp<S>>
-        : Land<ClaimOf<D2>, S, [], Ops, []>
+        : Land<ClaimOf<D2>, S, () => Assembled<OpResultSurface<S, [], Ops>, Ops>>
       : never;
 
 // Interfaces can't extend a mapped type (TS2312), so this stays an alias.
