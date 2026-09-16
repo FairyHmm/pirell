@@ -47,31 +47,32 @@ export function extend<F extends (data: any) => unknown>(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- single-stage op receives untyped data; the claim is checked at the call, not here
 ): (x: any) => ReturnType<F>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- implementation signature must stay any-compatible with all overloads; unknown would force casts throughout the body
-export function extend(surfaceOrOps: any, ops?: any): any {
+export function extend(surfaceOrOps: any, ops?: OpMap): any {
   if (ops !== undefined) {
     return applyExtend(surfaceOrOps, ops);
   }
   if (typeof surfaceOrOps === "function") {
     // Surfaces are callable functions too — unwrap raw values first,
     // then run the op on them.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- unwraps any surface-or-raw-value; valueOf takes unknown but the binding must accept everything
-    return (surfaceOrValue: any) => {
+    return (surfaceOrValue: unknown) => {
       const raw = valueOf(surfaceOrValue);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment -- the op's own params are the caller's (structural, see the data-op overload); raw is the untrusted input that op is contractually equipped to read
       const out = surfaceOrOps(raw);
       if (typeof out === "function") {
         throw new TypeError(
           "extend(fn): fn returned a function — parameterized ops aren't supported by this form (the data was taken as the op's argument). Wire it via extend(surface, { name: fn }) instead, or pre-apply the argument: extend(fn(arg)).",
         );
       }
-      return out;
+      return out as unknown;
     };
   }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- deferred applier accepts any surface; applyExtend validates via isSurface at runtime
-  return (surface: any) => applyExtend(surface, surfaceOrOps);
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- the one-arg ops-map form: surfaceOrOps here is the same map the OpMap annotation of the bootstrap branch statically knows
+  return (surface: unknown) => applyExtend(surface, surfaceOrOps);
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic dispatch over untyped surfaces; isSurface validates inside, return shape varies by branch
-function applyExtend(surface: any, ops: OpMap): any {
+// Dynamic dispatch over surfaces of any kind; isSurface validates
+// inside, and the resulting surface's exact shape depends on S/Ops.
+function applyExtend(surface: unknown, ops: OpMap): unknown {
   if (!isSurface(surface)) {
     throw new TypeError(
       "extend(surface, ops): surface has no .extend() method — pass an assembled pirell() surface.",
@@ -85,5 +86,5 @@ function applyExtend(surface: any, ops: OpMap): any {
       ? buildDeferred([], ops)
       : buildBound(surface.value, ops);
   }
-  return surface.extend(ops);
+  return surface.extend(ops) as unknown;
 }
