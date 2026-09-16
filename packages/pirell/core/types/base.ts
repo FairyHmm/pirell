@@ -7,6 +7,7 @@ export type Dim = "i" | "k";
 
 /** A nested shape, a leaf type, or an object (`unknown` excluded — it absorbs unions). */
 export type Branch =
+  // eslint-disable-next-line sonarjs/no-useless-intersection -- `string & {}` is the literal-branding idiom: it keeps `string`-literals from being absorbed by the union while still matching plain string leaves
   Shape | (string & {}) | (number & {}) | (boolean & {}) | object;
 
 /** A mixed node's children: positional or named. */
@@ -69,6 +70,7 @@ export type Op<In extends Shape, Out extends Shape> = (
  * yielding one once applied.
  */
 export type OpLike =
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the registrable union's params are caller-authored (typed ops must match by any); documented above the type
   ((data: any) => any) | ((...args: any[]) => (data: any) => any);
 
 /** Type-level tag for a data-bound surface: shape `S` proven from data. */

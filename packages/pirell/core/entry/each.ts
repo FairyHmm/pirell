@@ -22,13 +22,12 @@ export type Keyed = ["k", "..."];
  * return is used as-is.
  */
 export const each =
-  (op: (data: any) => any): Op<Keyed, Keyed> =>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- each value's type is caller-authored; unknown's param would reject typed ops by contravariance. The return is never narrowed — valueOf consumes it or it is returned as-is.
+  (op: (data: any) => unknown): Op<Keyed, Keyed> =>
   (data) =>
     Object.fromEntries(
       Object.entries(data).map(([key, value]) => [
         key,
-        isSurface(op)
-          ? valueOf((op as (d: unknown) => unknown)(value))
-          : (op as (d: unknown) => unknown)(value),
+        isSurface(op) ? valueOf(op(value)) : op(value),
       ]),
     );

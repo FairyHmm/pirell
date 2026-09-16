@@ -14,7 +14,7 @@ import type { Deferred } from "../types/base.js";
  * pirell([1, 2]).value; // [1, 2]
  * ```
  */
-export function pirell<T>(data: T): BoundWith<{}, ShapeOf<T>>;
+export function pirell<T>(data: T): BoundWith<Record<never, never>, ShapeOf<T>>;
 /** Builds a deferred surface: no data yet, ops register for later. Calling it with data binds and runs everything registered. */
 export function pirell(): Deferred<[]>;
 export function pirell(...args: [unknown] | []): unknown {

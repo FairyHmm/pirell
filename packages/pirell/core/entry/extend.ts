@@ -81,10 +81,21 @@ function applyExtend(surface: unknown, ops: OpMap): unknown {
   // A bare surface (ops: {}) has no `.extend` method yet — bootstrap
   // its table directly; everything else uses its real method, going
   // through the ordinary Registration/applyOp path.
-  if (typeof surface.extend !== "function") {
+  if (!canExtend(surface)) {
     return surface.value === undefined
       ? buildDeferred([], ops)
       : buildBound(surface.value, ops);
   }
-  return surface.extend(ops) as unknown;
+  return surface.extend(ops);
+}
+
+// The runtime `typeof extend === "function"` check doubles as the
+// shape predicate: every surface with an `.extend` member implements
+// the ordinary extend(ops) → surface signature.
+function canExtend(
+  surface: Record<PropertyKey, unknown>,
+): surface is Record<PropertyKey, unknown> & {
+  extend: (ops: OpMap) => unknown;
+} {
+  return typeof surface.extend === "function";
 }
