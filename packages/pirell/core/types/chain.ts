@@ -105,7 +105,7 @@ export type ComposeChain<Fns extends readonly unknown[]> =
         ? F extends (...args: any[]) => (data: any) => infer R
           ? [F, ...Tail<Rest, R>]
           : never
-        : F extends (arg: infer A) => infer R
+        : F extends (arg: infer _A) => infer R
           ? Rest extends []
             ? [F]
             : [F, ...Tail<Rest, R>]
