@@ -3,7 +3,7 @@
   "author": "Fairy",
   "private": true,
   "description": "Bundle compatibility tests for Pirell across vite, esbuild, rollup, and webpack.",
-  "license": "ISC",
+  "license": "MPL-2.0",
   "version": "0.1.0",
   "type": "module",
   "scripts": {

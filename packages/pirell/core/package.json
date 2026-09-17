@@ -12,7 +12,7 @@
   "files": [
     "dist"
   ],
-  "license": "ISC",
+  "license": "MPL-2.0",
   "keywords": [
     "data",
     "pipeline",
@@ -35,7 +35,7 @@
     "perf:bench": "tsx perf/bench.mts",
     "perf:errsize": "tsx perf/errsize.mts",
     "perf:all": "pnpm run perf:count && pnpm run perf:length && pnpm run perf:bench && pnpm run perf:errsize",
-    "jsr:check": "deno publish --dry-run --no-prompt"
+    "jsr:check": "deno publish --dry-run --allow-dirty"
   },
   "devDependencies": {
     "@types/node": "^26.4.1",

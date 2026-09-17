@@ -3,7 +3,7 @@
   "author": "Fairy",
   "private": true,
   "description": "Monorepo for the Pirell library and showcase site.",
-  "license": "ISC",
+  "license": "MPL-2.0",
   "scripts": {
     "build": "pnpm -r --filter './packages/pirell/*' build",
     "test": "pnpm -r --filter './packages/pirell/*' test",

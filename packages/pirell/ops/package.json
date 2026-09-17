@@ -12,7 +12,7 @@
   "files": [
     "dist"
   ],
-  "license": "ISC",
+  "license": "MPL-2.0",
   "keywords": [
     "data",
     "pipeline",
@@ -27,7 +27,7 @@
     "build": "tsdown",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "jsr:check": "deno publish --dry-run --no-prompt"
+    "jsr:check": "deno publish --dry-run --allow-dirty"
   },
   "dependencies": {
     "@pirell/core": "workspace:*"
