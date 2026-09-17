@@ -100,10 +100,11 @@ const runJoin = <R, S, E>(
   resolveKeys: () => JoinKeys | JoinKeyFn<R, S> | KeyResolver | undefined,
   emit: (rows: Row[]) => E,
 ): E => {
-  const keepLeft = kind === "left" || kind === "full";
+  const keepLeft = kind === "left" || kind === "full" || kind === "anti";
   const keepRight = kind === "right" || kind === "full";
 
-  // Empty-side early exits, preserving unmatched semantics.
+  // Empty-side early exits, preserving unmatched semantics (anti with
+  // an empty right keeps every left row — nothing to exclude).
   if (leftRows.length === 0) return emit(keepRight ? rightRows : []);
   if (rightRows.length === 0) return emit(keepLeft ? leftRows : []);
 
@@ -114,6 +115,16 @@ const runJoin = <R, S, E>(
 
   const on = resolveKeys();
   const keyFns = resolveKeyFns(leftRows[0], rightRows[0], on);
+  if (kind === "anti")
+    return emit(
+      keyFns
+        ? antiJoin(leftRows, rightRows, keyFns)
+        : antiScan(
+            leftRows,
+            rightRows,
+            resolveMatcher(leftRows[0], rightRows[0], on),
+          ),
+    );
   if (keyFns)
     return emit(hashJoin(leftRows, rightRows, keyFns, keepLeft, keepRight));
   return emit(
@@ -170,6 +181,19 @@ export const hashJoin = (
 
   return out;
 };
+
+// Left rows with no match, via a right-side key set. Unmerged and
+// unduplicated — the anti half of the hash path.
+const antiJoin = (data: Row[], rightRows: Row[], keys: KeyFns): Row[] => {
+  const [leftKey, rightKey] = keys;
+  const present = new Set<unknown>();
+  for (const r of rightRows) present.add(rightKey(r));
+  return data.filter((left) => !present.has(leftKey(left)));
+};
+
+// Left rows with no match, pairwise. The anti half of the predicate path.
+const antiScan = (data: Row[], rightRows: Row[], matches: Matcher): Row[] =>
+  data.filter((left) => !rightRows.some((r) => matches(left, r)));
 
 // Pairwise loop for function matchers.
 export const nestedJoin = (

@@ -63,6 +63,33 @@ export const take =
   (data) =>
     n <= 0 ? [] : data.slice(0, n);
 
+/**
+ * Renames fields, simultaneously from the original keys (so swaps
+ * work). Later original keys win on collision; missing old names are
+ * ignored; non-object elements pass through unchanged.
+ *
+ * ```ts
+ * import { pirell } from "@pirell/ops";
+ *
+ * pirell(orders).rename({ amount: "total" }).value;
+ * ```
+ *
+ * @param mapping Old field name to new field name.
+ */
+export const rename =
+  (mapping: Record<string, string>): Rewrap =>
+  (data) =>
+    data.map((row) => {
+      if (typeof row !== "object" || row === null || Array.isArray(row))
+        return row;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- caller-owned row contract (see fields.js)
+      const rec = row as Record<string, unknown>;
+      const out: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(rec))
+        out[mapping[key] ?? key] = value;
+      return out;
+    });
+
 /** Projection: a field name, or a function over the row (caller-typed). */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- row type is caller-supplied, see doc comment above
 export type PluckKey = string | ((row: any) => unknown);

@@ -1,8 +1,9 @@
 /**
  * Standard operations for pirell pipelines: grouping (`groupBy`,
  * `indexBy`), row conveniences (`sort`, `distinct`, `take`, `pluck`,
- * plus the `filter`/`find`/`findLast`/`some`/`every` predicate
- * shorthands), the `each` broadcast combinator, plus the native
+ * `rename`, plus the `filter`/`find`/`findLast`/`some`/`every`
+ * predicate shorthands), column aggregations (`sum`, `avg`, `max`,
+ * `min`), the `each` broadcast combinator, plus the native
  * `Array`/`Object` fallthroughs.
  *
  * ```ts
@@ -18,9 +19,9 @@
  * ```
  *
  * Method sets live in {@linkcode opsMethods} (`groupingMethods` +
- * `tableMethods` + `each` + `arrayFallthroughMethods` +
- * `objectFallthroughMethods`); every op is also exported standalone
- * for `pipe` from `@pirell/core`.
+ * `tableMethods` + `aggregateMethods` + `each` +
+ * `arrayFallthroughMethods` + `objectFallthroughMethods`); every op is
+ * also exported standalone for `pipe` from `@pirell/core`.
  *
  * @module
  */
@@ -28,6 +29,7 @@ import { pirell as pirellRaw } from "@pirell/core";
 import type { CoreOps, Extended } from "@pirell/core";
 import { groupingMethods } from "./grouping/groups.js";
 import { tableMethods } from "./table/methods.js";
+import { aggregateMethods } from "./table/aggregate.js";
 import { arrayFallthroughMethods } from "./fallthrough/array.js";
 import { objectFallthroughMethods } from "./fallthrough/object.js";
 import { each } from "./grouping/each.js";
@@ -37,6 +39,7 @@ export * from "./grouping/each.js";
 export * from "./table/rows.js";
 export * from "./table/distinct.js";
 export * from "./table/predicates.js";
+export * from "./table/aggregate.js";
 export * from "./fallthrough/array.js";
 export * from "./fallthrough/object.js";
 
@@ -48,6 +51,7 @@ export * from "./fallthrough/object.js";
 export const opsMethods = {
   ...groupingMethods,
   ...tableMethods,
+  ...aggregateMethods,
   ...arrayFallthroughMethods,
   ...objectFallthroughMethods,
   each,
@@ -63,5 +67,4 @@ export type Ops = typeof opsMethods;
  * pirell([3, 1, 2]).sort().value; // [1, 2, 3]
  * ```
  */
-export const pirell: Extended<CoreOps & Ops> =
-  pirellRaw().extend(opsMethods);
+export const pirell: Extended<CoreOps & Ops> = pirellRaw().extend(opsMethods);

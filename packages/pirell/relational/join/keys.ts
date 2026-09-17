@@ -33,9 +33,10 @@ export type Matcher = (left: Row, right: Row) => boolean;
 
 /**
  * Join strategy; default `inner`. `left`/`right` keep unmatched rows
- * from that side, `full` keeps both, `cross` pairs everything.
+ * from that side, `full` keeps both, `cross` pairs everything, `anti`
+ * keeps left rows with no match, unmerged and unduplicated.
  */
-export type JoinKind = "inner" | "left" | "right" | "full" | "cross";
+export type JoinKind = "inner" | "left" | "right" | "full" | "cross" | "anti";
 
 /**
  * Options for {@linkcode join}. Exclusive arms: keyed strategies take
@@ -44,8 +45,8 @@ export type JoinKind = "inner" | "left" | "right" | "full" | "cross";
  */
 export type JoinOptions<R, S> =
   | {
-      /** Strategy; default `"inner"`. */
-      join?: "inner" | "left" | "right" | "full";
+      /** Strategy; default `"inner"`. `anti` keeps unmatched left rows, unmerged. */
+      join?: "inner" | "left" | "right" | "full" | "anti";
       /** Explicit keys, a resolver (e.g. naturalKey), or per-pair projection. Omitted → natural key (single shared field). */
       on?: JoinKeys | JoinKeyFn<R, S> | KeyResolver;
     }

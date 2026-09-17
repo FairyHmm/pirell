@@ -1,5 +1,5 @@
 import { distinct } from "./distinct.js";
-import { take, pluck, sort } from "./rows.js";
+import { take, pluck, rename, sort } from "./rows.js";
 import { every, filter, find, findLast, some } from "./predicates.js";
 
 /**
@@ -16,6 +16,7 @@ export const tableMethods = {
   distinct,
   take,
   pluck,
+  rename,
   filter,
   find,
   findLast,
