@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { pirell } from "../index.js";
-import { sort } from "./array.js";
 
 // Domain data, bare — same fixtures as group.test.ts. Fluent callbacks
 // are on `any` rows (fallthrough contract), so they need no annotations.
@@ -25,30 +24,6 @@ describe("array methods: transform", () => {
       { status: "paid", amount: 10 },
       { status: "paid", amount: 14 },
       { status: "unpaid", amount: 4 },
-    ]);
-  });
-
-  it("filter keeps matching rows", () => {
-    const result = pirell(orders).filter((o: Order) => o.amount > 3);
-    expect(result.value).toEqual([
-      { status: "paid", amount: 5 },
-      { status: "paid", amount: 7 },
-    ]);
-  });
-
-  it("sort sorts a copy, leaving the input untouched", () => {
-    const input = [3, 1, 2];
-    const sorted = sort()(input);
-    expect(sorted).toEqual([1, 2, 3]);
-    expect(input).toEqual([3, 1, 2]);
-  });
-
-  it("sort accepts a comparator", () => {
-    const result = pirell(orders).sort((a: Order, b: Order) => b.amount - a.amount);
-    expect(result.value).toEqual([
-      { status: "paid", amount: 7 },
-      { status: "paid", amount: 5 },
-      { status: "unpaid", amount: 2 },
     ]);
   });
 

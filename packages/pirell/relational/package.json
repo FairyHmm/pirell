@@ -31,6 +31,7 @@
   },
   "dependencies": {
     "@pirell/core": "workspace:*",
+    "@pirell/ops": "workspace:*",
     "nano-string-utils": "^0.28.1"
   },
   "devDependencies": {

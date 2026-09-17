@@ -7,7 +7,7 @@
  * ```ts
  * import { pirell } from "@pirell/ops";
  *
- * pirell([3, 1, 2]).sort().value; // [1, 2, 3]
+ * pirell([3, 1, 2]).reverse().value; // [2, 1, 3]
  * ```
  *
  * @module
@@ -43,29 +43,6 @@ export const map =
   (fn: ArrayCallback): Rewrap =>
   (data): unknown[] =>
     data.map(fn);
-
-/**
- * Keeps matching elements, staying an open column.
- *
- * @param pred Tests each element; truthy keeps it.
- */
-export const filter =
-  (pred: ArrayCallback): Rewrap =>
-  (data) =>
-    data.filter(pred);
-
-/**
- * Sorts a copy — never mutates the input.
- *
- * @param compare Ordering function; without one, elements sort by
- * string conversion (native). Same caller-types-values contract as
- * {@linkcode ArrayCallback}.
- */
-export const sort =
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- comparand type is caller-supplied, see doc comment above
-  (compare?: (a: any, b: any) => number): Rewrap =>
-    (data) =>
-      data.toSorted(compare);
 
 /**
  * Takes a subrange.
@@ -111,8 +88,7 @@ export const concat =
     data.concat(...items);
 
 /**
- * Reverses a copy — never mutates the input. Named for the operation,
- * as {@linkcode sort} calls `toSorted()`.
+ * Reverses a copy — never mutates the input.
  */
 export const reverse = (): Rewrap => (data) => data.toReversed();
 
@@ -143,16 +119,6 @@ export const toSpliced =
       : data.toSpliced(start, deleteCount, ...items);
 
 /**
- * Returns the first match, or `undefined`.
- *
- * @param pred Tests each element.
- */
-export const find =
-  (pred: ArrayCallback): Terminal =>
-  (data) =>
-    data.find(pred);
-
-/**
  * Returns the first matching position, or `-1`.
  *
  * @param pred Tests each element.
@@ -161,16 +127,6 @@ export const findIndex =
   (pred: ArrayCallback): Terminal =>
   (data) =>
     data.findIndex(pred);
-
-/**
- * Returns the last match, or `undefined`.
- *
- * @param pred Tests each element.
- */
-export const findLast =
-  (pred: ArrayCallback): Terminal =>
-  (data) =>
-    data.findLast(pred);
 
 /**
  * Returns the last matching position, or `-1`.
@@ -202,26 +158,6 @@ export const arrayJoin =
   (separator?: string): Terminal =>
   (data) =>
     separator === undefined ? data.join() : data.join(separator);
-
-/**
- * Answers whether any element matches.
- *
- * @param pred Tests each element.
- */
-export const some =
-  (pred: ArrayCallback): Terminal =>
-  (data) =>
-    data.some(pred);
-
-/**
- * Answers whether every element matches.
- *
- * @param pred Tests each element.
- */
-export const every =
-  (pred: ArrayCallback): Terminal =>
-  (data) =>
-    data.every(pred);
 
 /**
  * Returns the first occurrence position, or `-1`.
@@ -313,8 +249,6 @@ export const reduceRight =
 /** Column-returning array ops, as data for `extend`. */
 export const arrayTransformMethods = {
   map,
-  filter,
-  sort,
   slice,
   flat,
   flatMap,
@@ -326,17 +260,13 @@ export const arrayTransformMethods = {
 
 /** Element-finding array ops, as data for `extend`. */
 export const arrayLookupMethods = {
-  find,
   findIndex,
-  findLast,
   findLastIndex,
   at,
 };
 
 /** Boolean/index-probing array ops, as data for `extend`. */
 export const arrayTestMethods = {
-  some,
-  every,
   indexOf,
   lastIndexOf,
   includes,

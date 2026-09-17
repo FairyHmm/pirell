@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { pipe } from "@pirell/core";
 import { pirell } from "../index.js";
 import { entries } from "./object.js";
-import { filter, map, reduce } from "./array.js";
+import { filter } from "../table/predicates.js";
+import { map, reduce } from "./array.js";
 
 // Domain data, bare — same fixtures as group.test.ts. Fluent callbacks
 // are typed here so the fallthrough goes any-≤ the assertions.
