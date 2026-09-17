@@ -6,6 +6,7 @@
 
 import type {
   Bound,
+  CurrentData,
   CurrentShp,
   Deferred,
   Op,
@@ -13,7 +14,7 @@ import type {
   OpMap,
   Shape,
 } from "./base.js";
-import type { ShapeOf } from "./codec.js";
+import type { DataOf, ShapeOf } from "./codec.js";
 import type { MatchShape } from "./match-shape.js";
 
 /**
@@ -154,7 +155,11 @@ type DirectOpPath<F, S, Ops extends OpMap> =
     : F extends (data: infer D2) => unknown
       ? [ClaimOf<D2>] extends [never]
         ? ShapeMismatch<never, CurrentShp<S>>
-        : Land<ClaimOf<D2>, S, () => Assembled<OpResultSurface<S, [], Ops>, Ops>>
+        : Land<
+            ClaimOf<D2>,
+            S,
+            () => Assembled<OpResultSurface<S, [], Ops>, Ops>
+          >
       : never;
 
 // Interfaces can't extend a mapped type (TS2312), so this stays an alias.
@@ -172,11 +177,21 @@ export type ResolvedOpsDeferred<
 > = Shp extends infer S extends Shape
   ? Ops extends infer O extends OpMap
     ? Omit<Deferred<S>, "value"> & {
-        <T>(data: T): BoundWith<O, ShapeOf<T>>;
+        <T>(data: T): BoundWith<O, ShapeOf<Refeed<T>>>;
         readonly value: undefined;
       }
     : never
   : never;
+
+// Re-feed: a bound surface unwraps to its data (runtime `valueOf` in
+// builders/architecture). Deferred surfaces pass through untouched —
+// they hold no data yet and fail claims downstream. Plain data is itself.
+type Refeed<T> =
+  T extends Deferred<Shape>
+    ? T
+    : [CurrentData<T>] extends [never]
+      ? T
+      : CurrentData<T>;
 
 /** The surface an op application lands on: a deferred surface stays deferred (no data to gate yet — its calls bind `T` and validate claims at bind time), a bound one collapses to the result. */
 export type OpResultSurface<S, Out extends Shape, Ops extends OpMap> =
@@ -194,4 +209,34 @@ export type Assembled<S, Ops extends OpMap = Record<never, never>> = OpMethods<
   Ops,
   S
 > &
-  S;
+  S &
+  KeyedAccess<S> &
+  IndexedAccess<S>;
+
+// Untyped key access for keyed-bound surfaces (`.orders`, destructuring).
+// `Record<string, unknown>` is transparent to every existing member
+// (`F & unknown = F`), so methods keep their signatures and only
+// non-op props fall through to `unknown`. Deferred stays closed (no data
+// yet); literal keys are erased by shapes, so typos read `unknown` and
+// resolve to `undefined` at runtime — never silently callable.
+type KeyedAccess<S> =
+  S extends Deferred<Shape>
+    ? unknown
+    : S extends Bound<infer Shp>
+      ? DataOf<Shp> extends Record<string, unknown>
+        ? DataOf<Shp> extends unknown[]
+          ? unknown
+          : Record<string, unknown>
+        : unknown
+      : unknown;
+
+// Indexed access mirrors KeyedAccess for array positions (`surface[0]`).
+// Numeric index signatures never collide with string-named methods.
+type IndexedAccess<S> =
+  S extends Deferred<Shape>
+    ? unknown
+    : S extends Bound<infer Shp>
+      ? DataOf<Shp> extends unknown[]
+        ? Record<number, unknown>
+        : unknown
+      : unknown;

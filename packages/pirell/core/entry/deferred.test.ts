@@ -86,19 +86,17 @@ describe("Deferred.pipe / compose (lazy)", () => {
 
 describe("splitting a chain in two (value reuse)", () => {
   it("one-line chain equals the split chain", () => {
-    // FINDING (deferred): re-feeding a bound surface's result widens to a
-    // keyed shape (spread/brandless caveat) — escape hatch pending, per audit.
+    // Re-feed: a bound surface unwraps to its data (see Refeed), so
+    // splitting a chain in two ≡ writing it in one line.
     const entry = pirell().extend({ double, sumAll });
 
     const oneLine = entry([1, 2, 3]).double().sumAll();
 
     const res1 = entry([1, 2, 3]).double();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- the FINDING's value-reuse probe refuses to typecheck (TS2349 at 96); the lint flags are consequences of the deliberately-broken code, to dissolve with the escape hatch
     const split = entry(res1).sumAll();
 
     expect(oneLine.value).toBe(12);
     expect(res1.value).toEqual([2, 4, 6]);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access -- reads the FINDING probe's unresolved .value (see above)
     expect(split.value).toBe(12);
   });
 });

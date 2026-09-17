@@ -42,6 +42,14 @@ type SurfaceSpec = {
   applyOp: (op: OpLike, args: unknown[]) => unknown;
 };
 
+// Canonical array indices ("0", "1", ...). Excludes "length",
+// negatives, and padded forms ("01") — index reads only.
+const isArrayIndex = (prop: string): boolean => {
+  if (prop === "") return false;
+  const n = Number(prop);
+  return Number.isInteger(n) && n >= 0 && String(n) === prop;
+};
+
 // --- one universal loop ---
 
 // Proxy-based: a Registration can add methods mid-chain, so the table
@@ -59,8 +67,21 @@ function buildSurface(ops: OpMap, spec: SurfaceSpec): any {
       if (typeof prop !== "string") {
         return Reflect.get(t, prop, receiver) as unknown;
       }
-      const op = ops[prop];
-      if (op === undefined) return undefined;
+      const op = Object.hasOwn(ops, prop) ? ops[prop] : undefined;
+      if (op === undefined) {
+        // Key access: data fields behind op names. Own keys only —
+        // proto members ("constructor", ...) stay undefined. Arrays
+        // expose canonical indices only ("0", "1", ...).
+        const v: unknown = spec.getValue();
+        if (typeof v === "object" && v !== null) {
+          if (!Array.isArray(v)) {
+            if (Object.hasOwn(v, prop)) return Reflect.get(v, prop) as unknown;
+          } else if (isArrayIndex(prop)) {
+            return Reflect.get(v, prop) as unknown;
+          }
+        }
+        return undefined;
+      }
       return (...args: unknown[]) => {
         const result = spec.applyOp(op, args);
         return result;

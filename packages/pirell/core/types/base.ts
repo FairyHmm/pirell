@@ -76,7 +76,7 @@ export type OpLike =
 /** Type-level tag for a data-bound surface: shape `S` proven from data. */
 export interface Bound<S extends Shape> {
   readonly __shape?: S;
-  value: unknown;
+  value: Raw<S>;
 }
 
 /** A surface with no data yet: calling it binds data. */

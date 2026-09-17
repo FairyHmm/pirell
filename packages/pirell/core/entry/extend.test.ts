@@ -32,11 +32,12 @@ describe("standalone extend()", () => {
   });
 
   it("rejects a parameterized op at runtime too, with an actionable message", () => {
-    // Same call, forced past the type system (e.g. a JS caller, or `as any`)
-    // — the arity check is a real runtime guard, not just a type-level one.
-    // FINDING (deferred): running past the type-level rejection needs an
-    // escape hatch (design pending, per audit) — compiles to an error for now.
-    expect(() => extend(nth)([1, 2, 3])).toThrow(
+    // Same call, forced past the type-level rejection (which stays the
+    // rule for typed callers) — the arity check is a real runtime guard,
+    // not just a type-level one.
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- sanctioned bypass: exercises the runtime backstop behind the type-level rejection
+    const forced = nth as (data: unknown) => unknown;
+    expect(() => extend(forced)([1, 2, 3])).toThrow(
       /parameterized ops aren't supported/,
     );
   });
