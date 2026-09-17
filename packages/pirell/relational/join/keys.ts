@@ -1,7 +1,8 @@
 /**
- * Key-matching strategies for {@linkcode join}: explicit tuples,
- * per-pair projections, and natural key inference.
+ * Key specs and matching strategies for {@linkcode join}. Inference
+ * (`naturalKey`, `autoKey`) lives in `inference.ts`.
  */
+import { naturalKey } from "./inference.js";
 
 /** Explicit key pair: `[leftKey, rightKey]`. */
 export type JoinKeys = readonly [leftKey: string, rightKey: string];
@@ -10,9 +11,8 @@ export type JoinKeys = readonly [leftKey: string, rightKey: string];
 export type JoinKeyValues = readonly [leftValue: unknown, rightValue: unknown];
 
 /**
- * Per-pair projection over the caller's own row types. Returns the
- * compared values (not field names — those go in a tuple); the pair
- * matches on `===`.
+ * Per-pair projection over the caller's own row types: compared values
+ * (not field names), matched on `===`.
  */
 export type JoinKeyFn<R, S> = (left: R, right: S) => JoinKeyValues;
 
@@ -20,9 +20,8 @@ export type JoinKeyFn<R, S> = (left: R, right: S) => JoinKeyValues;
 export type Row = Record<string, unknown>;
 
 /**
- * A key resolver: samples in, names out. Value-independent by contract —
- * the join calls it once with first rows and hashes on the tuple, the
- * same as a written tuple. Carry the brand to plug in your own.
+ * A key resolver: samples in, names out, value-independent by contract,
+ * so the join hashes the tuple. Brand to plug in your own.
  */
 export interface KeyResolver {
   (left: Row | undefined, right: Row | undefined): JoinKeys;
@@ -32,16 +31,39 @@ export interface KeyResolver {
 /** Pair predicate: same `===` comparison however the keys were given. */
 export type Matcher = (left: Row, right: Row) => boolean;
 
-/** Per-side key extractors, hashable when both exist. */
+/**
+ * Join strategy; default `inner`. `left`/`right` keep unmatched rows
+ * from that side, `full` keeps both, `cross` pairs everything.
+ */
+export type JoinKind = "inner" | "left" | "right" | "full" | "cross";
+
+/**
+ * Options for {@linkcode join}. Exclusive arms: keyed strategies take
+ * `on`; `cross` takes none (passing `on` is a type error, ignored at
+ * runtime).
+ */
+export type JoinOptions<R, S> =
+  | {
+      /** Strategy; default `"inner"`. */
+      join?: "inner" | "left" | "right" | "full";
+      /** Explicit keys, a resolver (e.g. naturalKey), or per-pair projection. Omitted → natural key (single shared field). */
+      on?: JoinKeys | JoinKeyFn<R, S> | KeyResolver;
+    }
+  | {
+      /** Cartesian product. */
+      join: "cross";
+      on?: never;
+    };
+
+/** Paired per-side key extractors for hash indexing. */
 export type KeyFns = readonly [
   leftKey: (row: Row) => unknown,
   rightKey: (row: Row) => unknown,
 ];
 
 /**
- * Per-side extractors for tuple/natural keys. `null` for pair
- * predicates: a JoinKeyFn reads both rows per pair, so its halves can't
- * split. Resolvers hash — they're branded value-independent (see below).
+ * Per-side extractors, or `null` for pair predicates (halves can't
+ * split). Branded resolvers hash.
  */
 export const resolveKeyFns = <R, S>(
   left: Row | undefined,
@@ -62,10 +84,7 @@ const keyed = ([lk, rk]: JoinKeys): KeyFns => [(l) => l[lk], (r) => r[rk]];
 const isResolver = (on: (...args: never[]) => unknown): on is KeyResolver =>
   "__keyResolver" in on;
 
-/**
- * Pair predicate from `on`: keyed forms compare extracted halves, a
- * function projects each pair to compared values.
- */
+/** Pair predicate from `on`: keyed halves compared, pairs projected. */
 export const resolveMatcher = <R, S>(
   left: Row | undefined,
   right: Row | undefined,
@@ -85,27 +104,3 @@ export const resolveMatcher = <R, S>(
     return pair[0] === pair[1];
   };
 };
-
-/**
- * Resolves the natural key: the shared field of both first rows, as an
- * explicit `on` tuple. Zero or multiple shared fields throws. Branded a
- * resolver, so passing this function as `on` hashes like the tuple —
- * pass the result for a written-tuple equivalent.
- */
-export const naturalKey: KeyResolver = Object.assign(
-  (left: Row | undefined, right: Row | undefined): JoinKeys => {
-    const rightKeys = new Set(Object.keys(right ?? {}));
-    const shared = Object.keys(left ?? {}).filter((k) => rightKeys.has(k));
-    if (shared.length === 0)
-      throw new Error(
-        "join: no shared key between the tables — pass explicit `on`",
-      );
-    if (shared.length > 1)
-      throw new Error(
-        `join: ambiguous shared keys (${shared.join(", ")}) — pass explicit \`on\``,
-      );
-    const [key = ""] = shared;
-    return [key, key];
-  },
-  { __keyResolver: true as const },
-);

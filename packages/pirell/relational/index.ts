@@ -16,11 +16,12 @@
  */
 import { pirell as pirellRaw } from "@pirell/core";
 import type { CoreOps, Extended } from "@pirell/core";
-import { join } from "./join/join.js";
+import { join, joinDb } from "./join/join.js";
 
-export type { Scalar, Column, Row, Table } from "./types.js";
+export type { Scalar, Column, Db, Row, Table } from "./types.js";
 export * from "./join/join.js";
 export * from "./join/keys.js";
+export * from "./join/inference.js";
 
 /**
  * Every op on the surface, as data for `extend`. Spread in your own ops
@@ -28,6 +29,7 @@ export * from "./join/keys.js";
  */
 export const relationalMethods = {
   join,
+  joinDb,
 };
 /** The ops map behind {@linkcode pirell}, as a type for composition. */
 export type RelationalOps = typeof relationalMethods;

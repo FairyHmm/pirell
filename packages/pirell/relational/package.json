@@ -30,7 +30,8 @@
     "jsr:check": "deno publish --dry-run --allow-dirty"
   },
   "dependencies": {
-    "@pirell/core": "workspace:*"
+    "@pirell/core": "workspace:*",
+    "nano-string-utils": "^0.28.1"
   },
   "devDependencies": {
     "tsdown": "^0.22.14",

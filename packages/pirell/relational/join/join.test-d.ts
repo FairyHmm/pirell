@@ -1,5 +1,6 @@
-// Compile-time-only pin for join shape rejection (see join.test.ts) —
+// Compile-time-only pins for join shape rejection (see join.test.ts) —
 // statically checked, never runs.
+import { pirell } from "../index.js";
 import { join } from "./join.js";
 
 {
@@ -9,4 +10,11 @@ import { join } from "./join.js";
   join(rows)(nums);
   // @ts-expect-error -- cross joins take no `on`
   join(rows, { join: "cross", on: ["id", "id"] })(rows);
+  // @ts-expect-error -- joinDb expects Db, not ["i"]
+  pirell(nums).joinDb("a", "b");
+  // Uniform dbs prove a uniform stack, not Db — join those tables
+  // with standalone join instead.
+  const homo = { a: [{ x: 1 }], b: [{ x: 2 }] };
+  // @ts-expect-error -- homo db is ["k", ...], not ["k..."]
+  pirell(homo).joinDb("a", "b");
 }

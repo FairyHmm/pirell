@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { pipe } from "@pirell/core";
-import { join } from "./join.js";
-import { naturalKey } from "./keys.js";
+import { join, joinDb } from "./join.js";
+import { naturalKey } from "./inference.js";
 import { pirell } from "../index.js";
 
 // Domain data, bare — array-of-objects derives a Table-compatible
@@ -181,5 +181,122 @@ describe("join", () => {
       { order_id: 2, customer_id: 20, amount: 7, id: 20, name: "Bob" },
       { order_id: 3, customer_id: 10, amount: 2, id: 10, name: "Ada" },
     ]);
+  });
+});
+
+// Domain db, bare — the tables derive Table-compatible shapes and the
+// db itself a Db-compatible one, so fixtures need no annotations.
+const db = {
+  orders: [
+    { order_id: 1, customer_id: 10, amount: 5 },
+    { order_id: 2, customer_id: 20, amount: 7 },
+    { order_id: 3, customer_id: 10, amount: 2 },
+  ],
+  customers: [
+    { id: 10, name: "Ada" },
+    { id: 20, name: "Bob" },
+  ],
+  products: [{ sku: "x", price: 9 }],
+};
+
+describe("joinDb", () => {
+  it("auto-keys dimension-left (customers.id <-> orders.customer_id)", () => {
+    const result = joinDb("customers", "orders")(db);
+    expect(result["customers"]).toEqual([
+      { id: 10, name: "Ada", order_id: 1, customer_id: 10, amount: 5 },
+      { id: 10, name: "Ada", order_id: 3, customer_id: 10, amount: 2 },
+      { id: 20, name: "Bob", order_id: 2, customer_id: 20, amount: 7 },
+    ]);
+  });
+
+  it("auto-keys fact-left (orders.customer_id <-> customers.id)", () => {
+    const result = joinDb("orders", "customers")(db);
+    expect(result["orders"]).toEqual([
+      { order_id: 1, customer_id: 10, amount: 5, id: 10, name: "Ada" },
+      { order_id: 2, customer_id: 20, amount: 7, id: 20, name: "Bob" },
+      { order_id: 3, customer_id: 10, amount: 2, id: 10, name: "Ada" },
+    ]);
+  });
+
+  it("keeps other tables intact, by reference", () => {
+    const result = joinDb("orders", "customers")(db);
+    expect(result["products"]).toBe(db.products);
+    expect(result["customers"]).toBe(db.customers);
+  });
+
+  it("accepts an explicit tuple", () => {
+    const result = joinDb("orders", "customers", {
+      on: ["customer_id", "id"],
+    })(db);
+    expect(result["orders"]).toHaveLength(3);
+  });
+
+  it("throws on a missing table", () => {
+    expect(() => joinDb("nope", "customers")(db)).toThrow(
+      /table 'nope' not found/,
+    );
+    expect(() => joinDb("orders", "nope")(db)).toThrow(
+      /table 'nope' not found/,
+    );
+  });
+
+  it("throws when no convention matches", () => {
+    const odd = { a: [{ x: 1 }], b: [{ y: "s" }] };
+    expect(() => joinDb("a", "b")(odd)).toThrow(/no shared key/);
+  });
+
+  it("empty tables preserve unmatched semantics under the left name", () => {
+    expect(
+      joinDb("orders", "customers")({ ...db, orders: [] })["orders"],
+    ).toEqual([]);
+    expect(
+      joinDb("orders", "customers", { join: "right" })({
+        ...db,
+        orders: [],
+      })["orders"],
+    ).toEqual(db.customers);
+    expect(
+      joinDb("orders", "customers", { join: "left" })({
+        ...db,
+        customers: [],
+      })["orders"],
+    ).toEqual(db.orders);
+  });
+
+  it("cross pairs every row under the left name", () => {
+    const result = joinDb("a", "b", { join: "cross" })({
+      a: [{ x: 1 }],
+      b: [{ y: "s" }, { y: "t" }],
+    });
+    expect(result["a"]).toEqual([
+      { x: 1, y: "s" },
+      { x: 1, y: "t" },
+    ]);
+  });
+
+  it("chains named joins (right tables stay joinable)", () => {
+    // Employees carry no `id`, so the merged rows keep the
+    // department `id` and the second autoKey still resolves.
+    const org = {
+      departments: [{ id: 1, name: "eng" }],
+      employees: [
+        { department_id: 1, name: "a" },
+        { department_id: 1, name: "b" },
+      ],
+      projects: [{ project_id: 100, department_id: 1, title: "p" }],
+    };
+    const chained = pirell(org)
+      .joinDb("departments", "employees")
+      .joinDb("departments", "projects");
+    expect(chained.value["departments"]).toEqual([
+      { id: 1, name: "a", department_id: 1, project_id: 100, title: "p" },
+      { id: 1, name: "b", department_id: 1, project_id: 100, title: "p" },
+    ]);
+  });
+
+  it("composes in pipe and wires as a fluent method", () => {
+    expect(pipe(db, joinDb("orders", "customers"))["orders"]).toHaveLength(3);
+    const result = pirell(db).joinDb("orders", "customers");
+    expect(result.value["orders"]).toHaveLength(3);
   });
 });

@@ -1,31 +1,17 @@
 import type { Op } from "@pirell/core";
-import type { Table } from "../types.js";
+import type { Db, Table } from "../types.js";
 import { resolveKeyFns, resolveMatcher } from "./keys.js";
+import { autoKey } from "./inference.js";
 import type {
   JoinKeys,
   JoinKeyFn,
+  JoinKind,
+  JoinOptions,
   KeyFns,
   KeyResolver,
   Matcher,
   Row,
 } from "./keys.js";
-
-/**
- * Keyed strategies take `on`; `cross` takes none (`on` with `cross` is a
- * type error; runtime callers see it ignored).
- */
-export type JoinOptions<R, S> =
-  | {
-      /** Strategy; default `"inner"`. */
-      join?: "inner" | "left" | "right" | "full";
-      /** Explicit keys, a resolver (e.g. naturalKey), or per-pair projection. Omitted → natural key (single shared field). */
-      on?: JoinKeys | JoinKeyFn<R, S> | KeyResolver;
-    }
-  | {
-      /** Cartesian product. */
-      join: "cross";
-      on?: never;
-    };
 
 /**
  * Relational join. SQL row-multiplying semantics; flat merge
@@ -49,32 +35,110 @@ export type JoinOptions<R, S> =
 export const join =
   <R, S>(right: S[], options?: JoinOptions<R, S>): Op<Table, Table> =>
   (data) => {
-    const kind = options?.join ?? "inner";
     // Seam: caller-typed factory rows vs shape-read op (see GroupKey seam).
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- caller-owned row contract
     const rightRows = right as unknown as Row[];
-
-    const keepLeft = kind === "left" || kind === "full";
-    const keepRight = kind === "right" || kind === "full";
-
-    // Empty-side early exits, preserving unmatched semantics.
-    if (data.length === 0) return keepRight ? rightRows : [];
-    if (rightRows.length === 0) return keepLeft ? data : [];
-
-    if (kind === "cross")
-      return data.flatMap((left) => rightRows.map((r) => ({ ...left, ...r })));
-
-    // Hash path: keyable `on` indexes the right side once. O(n + m).
-    const keyFns = resolveKeyFns(data[0], rightRows[0], options?.on);
-    if (keyFns) return hashJoin(data, rightRows, keyFns, keepLeft, keepRight);
-
-    // Predicate path: function matcher. O(n * m).
-    const matches = resolveMatcher(data[0], rightRows[0], options?.on);
-    return nestedJoin(data, rightRows, matches, keepLeft, keepRight);
+    return runJoin(
+      data,
+      rightRows,
+      options?.join ?? "inner",
+      () => options?.on,
+      (rows) => rows,
+    );
   };
 
+/**
+ * Joins two named tables of a db. Same semantics as {@linkcode join}
+ * (row-multiplying, flat right-wins merge), but the tables are looked
+ * up by name and the result replaces the left table in a copy of the
+ * db — other tables ride along untouched, so named joins chain:
+ *
+ * ```ts
+ * pirell(db)
+ *   .joinDb("orders", "customers")
+ *   .joinDb("orders", "products").orders.value;
+ * ```
+ *
+ * Omitted `on` infers by name ({@linkcode autoKey}); explicit tuples,
+ * resolvers, and per-pair functions behave as in {@linkcode join}.
+ *
+ * @param leftName Table to replace with the joined result.
+ * @param rightName Table to join in (kept as-is).
+ * @param options Strategy and key specification.
+ */
+export const joinDb =
+  <R, S>(
+    leftName: string,
+    rightName: string,
+    options?: JoinOptions<R, S>,
+  ): Op<Db, Db> =>
+  (data) => {
+    const db: Record<string, unknown> = data;
+    const leftRows = table(db, leftName);
+    const rightRows = table(db, rightName);
+    const kind = options?.join ?? "inner";
+
+    // Omitted `on` infers by table name; explicit forms behave as in join.
+    // Resolved lazily: empty sides and cross never reach key inference.
+    return runJoin(
+      leftRows,
+      rightRows,
+      kind,
+      () =>
+        options?.on ?? autoKey(leftName, rightName, leftRows[0], rightRows[0]),
+      (rows) => ({ ...db, [leftName]: rows }),
+    );
+  };
+
+// One skeleton for every join — empty exits, cross, then hash (O(n+m))
+// or predicate (O(n·m)) paths. Sources and sinks vary; keys resolve
+// lazily, after the exits.
+const runJoin = <R, S, E>(
+  leftRows: Row[],
+  rightRows: Row[],
+  kind: JoinKind,
+  resolveKeys: () => JoinKeys | JoinKeyFn<R, S> | KeyResolver | undefined,
+  emit: (rows: Row[]) => E,
+): E => {
+  const keepLeft = kind === "left" || kind === "full";
+  const keepRight = kind === "right" || kind === "full";
+
+  // Empty-side early exits, preserving unmatched semantics.
+  if (leftRows.length === 0) return emit(keepRight ? rightRows : []);
+  if (rightRows.length === 0) return emit(keepLeft ? leftRows : []);
+
+  if (kind === "cross")
+    return emit(
+      leftRows.flatMap((left) => rightRows.map((r) => ({ ...left, ...r }))),
+    );
+
+  const on = resolveKeys();
+  const keyFns = resolveKeyFns(leftRows[0], rightRows[0], on);
+  if (keyFns)
+    return emit(hashJoin(leftRows, rightRows, keyFns, keepLeft, keepRight));
+  return emit(
+    nestedJoin(
+      leftRows,
+      rightRows,
+      resolveMatcher(leftRows[0], rightRows[0], on),
+      keepLeft,
+      keepRight,
+    ),
+  );
+};
+
+// Looks up a table by name. Missing names (and non-table values) throw
+// rather than joining against undefined.
+const table = (db: Record<string, unknown>, name: string): Row[] => {
+  const rows: unknown = db[name];
+  if (!Array.isArray(rows))
+    throw new Error(`join: table '${name}' not found in db`);
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- caller-owned table contract (see seam comment in join)
+  return rows as Row[];
+};
+
 // Keyed loop over a right-side hash index.
-const hashJoin = (
+export const hashJoin = (
   data: Row[],
   rightRows: Row[],
   keys: KeyFns,
@@ -108,7 +172,7 @@ const hashJoin = (
 };
 
 // Pairwise loop for function matchers.
-const nestedJoin = (
+export const nestedJoin = (
   data: Row[],
   rightRows: Row[],
   matches: Matcher,

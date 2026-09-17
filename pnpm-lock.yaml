@@ -88,6 +88,9 @@ importers:
       '@pirell/core':
         specifier: workspace:*
         version: link:../core
+      nano-string-utils:
+        specifier: ^0.28.1
+        version: 0.28.1
     devDependencies:
       tsdown:
         specifier: ^0.22.14
@@ -1488,6 +1491,11 @@ packages:
       uglify-js:
         optional: true
 
+  nano-string-utils@0.28.1:
+    resolution: {integrity: sha512-/0WDfDDXBI5BQyS+em3LSP+1Su0AtCZLYb/DVUQEzFR+nqVO0K7T1F3s+W5Fa6Za2hmapq0VsVBO7NWNubSquw==}
+    engines: {node: '>=20'}
+    hasBin: true
+
   nanoid@3.3.18:
     resolution: {integrity: sha512-DTg4MJbGMWkfi6VZFdNt2/caMbQy4Ou+Op/hJQvGEWcnVfoA1QA+xzRKAzw9jD6+GVOOeYr/mIcuDSdug6F6+w==}
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
@@ -2867,6 +2875,8 @@ snapshots:
       esbuild: 0.28.2
       lightningcss: 1.33.0
       postcss: 8.5.28
+
+  nano-string-utils@0.28.1: {}
 
   nanoid@3.3.18: {}
 
