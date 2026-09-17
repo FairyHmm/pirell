@@ -27,6 +27,7 @@
     "build": "tsdown",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "perf:sql": "tsx perf/sql.mts",
     "jsr:check": "deno publish --dry-run --allow-dirty"
   },
   "dependencies": {
@@ -35,7 +36,10 @@
     "nano-string-utils": "^0.28.1"
   },
   "devDependencies": {
+    "@mdn/browser-compat-data": "^8.1.1",
+    "@types/node": "^22.20.3",
     "tsdown": "^0.22.14",
+    "tsx": "^4.23.13",
     "typescript": "^7.0.2",
     "vitest": "^4.1.11"
   }

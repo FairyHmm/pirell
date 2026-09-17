@@ -5,6 +5,7 @@
   "publish": {
     "exclude": [
       "**/*.test.ts",
+      "perf/**",
       "tsconfig.json",
       "tsdown.config.ts",
       "vitest.config.ts"
