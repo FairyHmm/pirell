@@ -1,8 +1,9 @@
 /**
  * SQL workload bench over real MDN compat data (20k features, 280k
- * support rows): each query runs as a pirell pipeline and as a
- * hand-rolled native baseline, checked for equal results. Min
- * across runs is primary (pauses only ever add).
+ * support rows): each query runs fluent, as a pipe of standalone ops,
+ * and as a hand-rolled native baseline, checked for equal results. Min
+ * across runs is primary (pauses only ever add). The wrap:pipe gap
+ * isolates wrapper dispatch; pipe:native isolates op-vs-hand-rolled.
  *
  * Usage: pnpm perf:sql [--flags]   (from packages/pirell/relational)
  *   --case name   run a single case
@@ -10,13 +11,13 @@
  * @module
  */
 import { pipe } from "@pirell/core";
-import { filter } from "@pirell/ops";
+import { each, entries, filter, groupBy, map, sort, take } from "@pirell/ops";
 import { pirell } from "../index.js";
 import { join } from "../join/join.js";
 import type { Feature, Release, Support } from "./bcd.js";
 import { tables } from "./bcd.js";
 
-const USAGE = `SQL workload bench over BCD: ms/call (min across runs), wrap vs native.
+const USAGE = `SQL workload bench over BCD: ms/call (min across runs), wrap vs pipe vs native.
   --case name   run a single case
   -h, --help    print this and exit`;
 
@@ -31,7 +32,10 @@ let sink: unknown = null;
 interface Case {
   name: string;
   rows: () => number;
-  wrap: () => unknown;
+  // Fluent is absent where the surface erases a needed generic (the
+  // pair-predicate key function); pipe carries that case alone.
+  wrap?: () => unknown;
+  pipe: () => unknown;
   native: () => unknown;
 }
 
@@ -59,6 +63,7 @@ const CASES: Case[] = [
     rows: () => pirell(features).filter("deprecated").value.length,
     wrap: () =>
       pirell(features).filter("deprecated").sort("path").take(100).value,
+    pipe: () => pipe(features, filter("deprecated"), sort("path"), take(100)),
     native: () =>
       features
         .filter((f) => f.deprecated)
@@ -70,6 +75,7 @@ const CASES: Case[] = [
     name: "join-hash",
     rows: () => support.length,
     wrap: () => pirell(support).join(features, { on: ["path", "path"] }).value,
+    pipe: () => pipe(support, join(features, { on: ["path", "path"] })),
     native: () => {
       const dim = new Map(features.map((f) => [f.path, f]));
       return support.map((s) => ({ ...s, ...dim.get(s.path)! }));
@@ -77,11 +83,11 @@ const CASES: Case[] = [
   },
   {
     // Same join through the pair-predicate path (subset: 1k x 20k
-    // pairs). Standalone+pipe: the fluent surface erases the key
-    // function's row generics, same as in join.test.ts.
+    // pairs). Pipe-only: the fluent surface erases the key function's
+    // row generics, same as in join.test.ts.
     name: "join-nested",
     rows: () => nestedSubset.length * features.length,
-    wrap: () =>
+    pipe: () =>
       pipe(
         nestedSubset,
         join(features, {
@@ -108,6 +114,16 @@ const CASES: Case[] = [
           browser,
           n: rows.length,
         })).value,
+    pipe: () =>
+      pipe(
+        support,
+        groupBy("browser"),
+        entries,
+        map(([browser, rows]: [string, Support[]]) => ({
+          browser,
+          n: rows.length,
+        })),
+      ),
     native: () => {
       const counts = new Map<string, number>();
       for (const s of support)
@@ -124,6 +140,11 @@ const CASES: Case[] = [
         on: ["path", "path"],
         join: "anti",
       }).value,
+    pipe: () =>
+      pipe(
+        features,
+        join(sparseSupport, { on: ["path", "path"], join: "anti" }),
+      ),
     native: () => {
       const covered = new Set(sparseSupport.map((s) => s.path));
       return features.filter((f) => !covered.has(f.path));
@@ -148,6 +169,21 @@ const CASES: Case[] = [
         .filter((r: { n: number }) => r.n > 0)
         .sort(byCountDesc)
         .take(5).value,
+    pipe: () =>
+      pipe(
+        support,
+        join(features, { on: ["path", "path"] }),
+        groupBy("browser"),
+        each(filter("deprecated")),
+        entries,
+        map(([browser, rows]: [string, unknown[]]) => ({
+          browser,
+          n: rows.length,
+        })),
+        filter((r: { n: number }) => r.n > 0),
+        sort(byCountDesc),
+        take(5),
+      ),
     native: () => {
       // Materialized like the pipeline (a fused counting loop skips
       // the merge and runs ~13x faster — fusion headroom, not dispatch
@@ -174,6 +210,13 @@ const CASES: Case[] = [
         .filter((r: Release) => r.status === "current")
         .sort(byDateDesc)
         .take(10).value,
+    pipe: () =>
+      pipe(
+        releases,
+        filter((r: Release) => r.status === "current"),
+        sort(byDateDesc),
+        take(10),
+      ),
     native: () =>
       releases
         .filter((r) => r.status === "current")
@@ -234,21 +277,33 @@ const num = (n: number): string => n.toLocaleString("en-US");
 const head = ["case", "min ms/call", "median ms/call", "iters", "rows in"];
 const lines: string[][] = [];
 const mins = new Map<string, number>();
+const forms = ["wrap", "pipe", "native"] as const;
 for (const c of CASES) {
   if (only && c.name !== only) continue;
-  // Equal results, checked once outside the clock.
-  const a = JSON.stringify(c.wrap());
-  const b = JSON.stringify(c.native());
-  if (a !== b) throw new Error(`${c.name}: wrap/native mismatch`);
-  const w = time(c.wrap);
-  const n = time(c.native);
-  mins.set(`${c.name}:wrap`, w.min);
-  mins.set(`${c.name}:native`, n.min);
-  const rows = num(c.rows());
-  lines.push(
-    [c.name, w.min.toFixed(1), w.med.toFixed(1), num(w.iters), rows],
-    ["  native", n.min.toFixed(1), n.med.toFixed(1), num(n.iters), rows],
+  // Equal results across present forms, checked once outside the clock.
+  const seen = new Set(
+    forms.flatMap((f) => {
+      const run = c[f];
+      return run === undefined ? [] : [JSON.stringify(run())];
+    }),
   );
+  if (seen.size !== 1) throw new Error(`${c.name}: form mismatch`);
+  const rows = num(c.rows());
+  let first = true;
+  for (const f of forms) {
+    const run = c[f];
+    if (run === undefined) continue;
+    const t = time(run);
+    mins.set(`${c.name}:${f}`, t.min);
+    lines.push([
+      first ? c.name : `  ${f}`,
+      t.min.toFixed(1),
+      t.med.toFixed(1),
+      num(t.iters),
+      rows,
+    ]);
+    first = false;
+  }
 }
 const widths = head.map((h, i) =>
   Math.max(h.length, ...lines.map((l) => (l[i] ?? "").length), 3),
@@ -263,16 +318,19 @@ console.log(
   ].join("\n"),
 );
 if (!only) {
-  const ratio = (name: string): string => {
-    const w = mins.get(`${name}:wrap`);
-    const n = mins.get(`${name}:native`);
-    if (w === undefined || n === undefined || n <= 0) return "—";
+  const ratio = (name: string, a: string, b: string): string => {
+    const x = mins.get(`${name}:${a}`);
+    const y = mins.get(`${name}:${b}`);
+    if (x === undefined || y === undefined || y <= 0) return "—";
     // Below the timer floor both forms read 0.0 — no ratio to report.
-    if (w < 0.05 || n < 0.05) return "floor";
-    return `${(w / n).toFixed(1)}×`;
+    if (x < 0.05 || y < 0.05) return "floor";
+    return `${(x / y).toFixed(1)}×`;
   };
   console.log(
-    `wrap:native  ${CASES.map((c) => `${c.name} ${ratio(c.name)}`).join("  ")}`,
+    `wrap:pipe  ${CASES.map((c) => `${c.name} ${ratio(c.name, "wrap", "pipe")}`).join("  ")}`,
+  );
+  console.log(
+    `pipe:native  ${CASES.map((c) => `${c.name} ${ratio(c.name, "pipe", "native")}`).join("  ")}`,
   );
 }
 console.log(`(sink: ${typeof sink})`);
