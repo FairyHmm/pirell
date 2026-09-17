@@ -329,8 +329,13 @@ if (!only) {
   console.log(
     `wrap:pipe  ${CASES.map((c) => `${c.name} ${ratio(c.name, "wrap", "pipe")}`).join("  ")}`,
   );
-  console.log(
-    `pipe:native  ${CASES.map((c) => `${c.name} ${ratio(c.name, "pipe", "native")}`).join("  ")}`,
-  );
+  const flagged = CASES.map((c) => {
+    const r = ratio(c.name, "pipe", "native");
+    const v = parseFloat(r);
+    return Number.isFinite(v) && v >= 2 ? `${c.name} ${r} ⚑` : `${c.name} ${r}`;
+  });
+  console.log(`pipe:native  ${flagged.join("  ")}`);
+  if (flagged.some((p) => p.includes("⚑")))
+    console.log("(⚑ pipe:native ≥ 2× — see the Perf note on the op)");
 }
 console.log(`(sink: ${typeof sink})`);
