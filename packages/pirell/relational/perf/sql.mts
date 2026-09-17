@@ -149,15 +149,18 @@ const CASES: Case[] = [
         .sort(byCountDesc)
         .take(5).value,
     native: () => {
+      // Materialized like the pipeline (a fused counting loop skips
+      // the merge and runs ~13x faster — fusion headroom, not dispatch
+      // overhead).
       const dim = new Map(features.map((f) => [f.path, f]));
+      const merged = support.map((s) => ({ ...s, ...dim.get(s.path)! }));
       const counts = new Map<string, number>();
-      for (const s of support) {
-        const f = dim.get(s.path);
-        if (f?.deprecated)
-          counts.set(s.browser, (counts.get(s.browser) ?? 0) + 1);
-      }
+      for (const m of merged)
+        if (m.deprecated)
+          counts.set(m.browser, (counts.get(m.browser) ?? 0) + 1);
       return [...counts.entries()]
         .map(([browser, n]) => ({ browser, n }))
+        .filter((r) => r.n > 0)
         .sort(byCountDesc)
         .slice(0, 5);
     },
