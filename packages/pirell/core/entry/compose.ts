@@ -45,26 +45,11 @@ function composeImpl(...fns: Stage[]): (x: unknown) => unknown {
     }, x);
 }
 
+// Branded `"chain"`: surfaces route this to the chain wiring below
+// (type-only; the runtime value is just the impl).
 /**
- * Runs functions left to right, returning a reusable pipeline — data
- * is applied later, checked then against the first link's entry claim.
- *
- * ```ts
- * import { compose } from "@pirell/core";
- * import type { Op } from "@pirell/core";
- *
- * type NumberTransform = Op<[["i", number]], [["i", number]]>;
- * const double: NumberTransform = (ns) =>
- *   ns.map((n) => n * 2);
- * const keep: NumberTransform = (ns) =>
- *   ns.filter((n) => n > 2);
- *
- * const run = compose(double, keep);
- * run([1, 2]); // [4]
- * ```
- *
- * Branded `"chain"`: surfaces route this to the chain wiring below.
- * Type-only — the runtime value is just the impl.
+ * Runs functions left to right, returning a reusable pipeline applied to
+ * data later.
  */
 export const compose: SpecialOp<"chain", typeof composeImpl> = composeImpl;
 
@@ -74,10 +59,7 @@ type ChainFns<S> = [
   ...Array<(arg: any) => unknown>,
 ];
 
-/**
- * A chain op's surface method, living with its owner: bound re-binds
- * to the composed result; deferred append stays deferred.
- */
+/** A chain op's surface method: bound re-binds to the composed result; deferred stays deferred. */
 export type ChainMethod<S, Ops extends OpMap = Record<never, never>> =
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- matches any Deferred instantiation
   S extends Deferred<any>
@@ -92,7 +74,10 @@ export type ChainMethod<S, Ops extends OpMap = Record<never, never>> =
       ? {
           <Fns extends ChainFns<S>>(
             ...fns: Fns & Tail<Fns, CurrentData<S>>
-          ): Assembled<Bound<ShapeOf<ComposeResult<Fns>>>, Ops>;
+          ): Assembled<
+            Bound<ShapeOf<ComposeResult<Fns>>, ComposeResult<Fns>>,
+            Ops
+          >;
         }
       : never;
 
@@ -113,28 +98,9 @@ type PipeFn = <Fns extends unknown[]>(
   ...fns: Fns & ComposeChain<Fns>
 ) => ComposeResult<Fns>;
 
-/**
- * Data-first {@linkcode compose}: threads data through each function
- * left to right.
- *
- * ```ts
- * import { pipe } from "@pirell/core";
- * import type { Op } from "@pirell/core";
- *
- * const double: Op<[["i", number]], [["i", number]]> = (ns) =>
- *   ns.map((n) => n * 2);
- * pipe([1, 2], double); // [2, 4]
- * ```
- *
- * Cast, not proven: `makeFlat`'s `Flatten<F>` pattern-matches a single
- * `(...args) => (data) => R` signature, but `compose` is overloaded
- * (a generic declared signature plus its implementation signature) —
- * `Flatten` can't walk that, so the assignment isn't structurally
- * checked either way. A single `as` here (not `as unknown as`, which
- * implies the direct cast was rejected — it isn't) is the honest
- * version of the same unchecked assertion; runtime correctness is
- * covered by `compose.test.ts`'s `pipe` suite instead.
- */
+// Cast, not proven: `Flatten` can't walk `compose`'s overload, so one
+// honest `as`; runtime covered by the pipe suite in `compose.test.ts`.
+/** Data-first {@linkcode compose}. */
 export const pipe =
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- documented below: Flatten can't walk compose's overload, so the single as (not as unknown as) is the honest unchecked assertion
   makeFlat(compose) as PipeFn;

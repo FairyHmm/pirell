@@ -1,8 +1,5 @@
-// The pirell wrapper's type level, one unit: per-op wiring (Fluent)
-// and whole-surface assembly (Assembled) are mutually recursive, so
-// they live here together. Imports point one way (leaf piles below,
-// entry/ above). Dispatch is by brand first (open SpecialWire
-// registry — owners contribute entries), then shape claims.
+// Per-op wiring (Fluent) and surface assembly (Assembled) are mutually
+// recursive — one unit. Dispatch is brand-first, then shape claims.
 
 import type {
   Bound,
@@ -12,10 +9,12 @@ import type {
   Op,
   OpLike,
   OpMap,
+  Raw,
   Shape,
 } from "./base.js";
 import type { DataOf, ShapeOf } from "./codec.js";
 import type { MatchShape } from "./match-shape.js";
+import type { NativeArms } from "./native.js";
 
 /**
  * Names a shape mismatch in error output instead of an opaque `never`.
@@ -26,11 +25,9 @@ export type ShapeMismatch<In extends Shape, Actual extends Shape> = {
   actual: Actual;
 };
 
-// Aliased Op factories can't re-match `Op<infer FIn, infer FOut>`
-// (the infer pulls a shape already flattened out of DataOf), so claims
-// are recovered from the op's plain data types — `unknown[]` /
-// `Record<string, unknown>` are exact markers. Closed aliased claims
-// stay unsupported.
+// Aliased factories can't re-match `Op<infer>` (infer flattens out of
+// DataOf), so claims recover from plain data types. Closed aliased
+// claims stay unsupported.
 type ClaimOf<D> = D extends unknown[]
   ? ["i", "..."]
   : D extends Record<string, unknown>
@@ -93,11 +90,8 @@ type BrandOf<F, S, Ops extends OpMap> = F extends {
   : never;
 
 /**
- * A wired surface method: matches the op's claim against the surface's
- * proven shape, re-wiring sibling ops onto the output. The check fires
- * at the call; unfit siblings turn uncallable rather than vanishing,
- * and the failure arm sits outside the arrow so a mismatched call
- * itself is uncallable (TS2349).
+ * A wired surface method: the op's claim checked against the surface
+ * shape, siblings re-wired onto the output. Mismatches are uncallable (TS2349).
  */
 export type Fluent<
   F extends OpLike,
@@ -117,8 +111,8 @@ export type Fluent<
       : never
     : BrandOf<F, S, Ops>;
 
-// One call's landing, shared by every ordinary arm: deferred rewires
-// without gating; bound checks the claim, fail-closed outside the arrow.
+// One call's landing: deferred rewires ungated; bound checks the claim,
+// fail-closed outside the arrow.
 type Land<In extends Shape, S, Call> =
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- matches any Deferred instantiation (see OpResultSurface)
   S extends Deferred<any>
@@ -127,16 +121,13 @@ type Land<In extends Shape, S, Call> =
       ? Call
       : ShapeMismatch<In, CurrentShp<S>>;
 
-/**
- * A fixed-arity factory: apply the args, get a data fn/op, then match
- * its claim against the surface's shape.
- */
+/** A fixed-arity factory: apply args, match the resulting claim against the surface shape. */
 type FactoryPath<A extends unknown[], R, S, Ops extends OpMap> =
   R extends Op<infer FIn extends Shape, infer FOut extends Shape>
     ? Land<
         FIn,
         S,
-        (...args: A) => Assembled<OpResultSurface<S, FOut, Ops>, Ops>
+        (...args: A) => Assembled<OpResultSurface<S, FOut, Ops, Raw<FOut>>, Ops>
       >
     : R extends (data: infer D) => infer RD
       ? [ClaimOf<D>] extends [never]
@@ -144,14 +135,16 @@ type FactoryPath<A extends unknown[], R, S, Ops extends OpMap> =
         : Land<
             ClaimOf<D>,
             S,
-            (...args: A) => Assembled<OpResultSurface<S, OutOf<RD>, Ops>, Ops>
+            (
+              ...args: A
+            ) => Assembled<OpResultSurface<S, OutOf<RD>, Ops, RD>, Ops>
           >
       : never;
 
 /** A data op as a whole function (direct Op or aliased one). */
 type DirectOpPath<F, S, Ops extends OpMap> =
   F extends Op<infer In extends Shape, infer Out extends Shape>
-    ? Land<In, S, () => Assembled<OpResultSurface<S, Out, Ops>, Ops>>
+    ? Land<In, S, () => Assembled<OpResultSurface<S, Out, Ops, Raw<Out>>, Ops>>
     : F extends (data: infer D2) => unknown
       ? [ClaimOf<D2>] extends [never]
         ? ShapeMismatch<never, CurrentShp<S>>
@@ -177,15 +170,14 @@ export type ResolvedOpsDeferred<
 > = Shp extends infer S extends Shape
   ? Ops extends infer O extends OpMap
     ? Omit<Deferred<S>, "value"> & {
-        <T>(data: T): BoundWith<O, ShapeOf<Refeed<T>>>;
+        <T>(data: T): BoundWith<O, ShapeOf<Refeed<T>>, Refeed<T>>;
         readonly value: undefined;
       }
     : never
   : never;
 
-// Re-feed: a bound surface unwraps to its data (runtime `valueOf` in
-// builders/architecture). Deferred surfaces pass through untouched —
-// they hold no data yet and fail claims downstream. Plain data is itself.
+// Re-feed: bound unwraps to data (runtime `valueOf`); deferred passes
+// through (no data yet); plain data is itself.
 type Refeed<T> =
   T extends Deferred<Shape>
     ? T
@@ -194,15 +186,21 @@ type Refeed<T> =
       : CurrentData<T>;
 
 /** The surface an op application lands on: a deferred surface stays deferred (no data to gate yet — its calls bind `T` and validate claims at bind time), a bound one collapses to the result. */
-export type OpResultSurface<S, Out extends Shape, Ops extends OpMap> =
+export type OpResultSurface<
+  S,
+  Out extends Shape,
+  Ops extends OpMap,
+  D = unknown,
+> =
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- matches any Deferred instantiation; Deferred<Shape> misses narrower outputs (covariant Bound return)
-  S extends Deferred<any> ? ResolvedOpsDeferred<Out, Ops> : Bound<Out>;
+  S extends Deferred<any> ? ResolvedOpsDeferred<Out, Ops> : Bound<Out, D>;
 
 /** A data-bound surface with the same ops still callable. Annotate chains as `BoundWith<typeof ops, Out>`. */
-export type BoundWith<Ops extends OpMap, Out extends Shape> = Assembled<
-  Bound<Out>,
-  Ops
->;
+export type BoundWith<
+  Ops extends OpMap,
+  Out extends Shape,
+  D = unknown,
+> = Assembled<Bound<Out, D>, Ops>;
 
 /** The decorated surface: its ops map wired as callable methods, plus the data (shape `S`). */
 export type Assembled<S, Ops extends OpMap = Record<never, never>> = OpMethods<
@@ -211,14 +209,13 @@ export type Assembled<S, Ops extends OpMap = Record<never, never>> = OpMethods<
 > &
   S &
   KeyedAccess<S> &
-  IndexedAccess<S>;
+  IndexedAccess<S> &
+  NativeArms<S, Ops>;
 
 // Untyped key access for keyed-bound surfaces (`.orders`, destructuring).
-// `Record<string, unknown>` is transparent to every existing member
-// (`F & unknown = F`), so methods keep their signatures and only
-// non-op props fall through to `unknown`. Deferred stays closed (no data
-// yet); literal keys are erased by shapes, so typos read `unknown` and
-// resolve to `undefined` at runtime — never silently callable.
+// `Record<string, unknown>` is transparent to members (`F & unknown =
+// F`); literal keys are erased, so typos read `unknown` and resolve to
+// `undefined` — never silently callable.
 type KeyedAccess<S> =
   S extends Deferred<Shape>
     ? unknown

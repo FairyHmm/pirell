@@ -27,10 +27,7 @@ export type DimTable = {
   "k...": "k";
 };
 
-/**
- * A shape: elements plus an optional open tail. Tails apply to nested
- * shapes only; mixed tags are terminal.
- */
+/** A shape: elements plus an optional open tail (nested only; mixed tags are terminal). */
 export type Shape = Elem[] | [...Elem[], "..."];
 
 /** The canonical {@linkcode Elem} classifier — matchers branch off its fields. */
@@ -50,10 +47,7 @@ export type ElemCase<E extends Elem> = E extends Dim
 
 // Unbranded — a private unique-symbol brand can't be named by packages
 // re-exporting it (TS4023 → TS7056).
-/**
- * {@linkcode DataOf} with an unknown-guard: unshaped claims collapse to plain
- * `unknown` instead of an unsatisfiable type.
- */
+/** {@linkcode DataOf} with an unknown-guard: unshaped claims collapse to plain `unknown`. */
 export type Raw<S extends Shape> = [unknown] extends [DataOf<S>]
   ? unknown
   : DataOf<S>;
@@ -73,9 +67,15 @@ export type OpLike =
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the registrable union's params are caller-authored (typed ops must match by any); documented above the type
   ((data: any) => any) | ((...args: any[]) => (data: any) => any);
 
-/** Type-level tag for a data-bound surface: shape `S` proven from data. */
-export interface Bound<S extends Shape> {
+// Scalar natives read `D`; shapes never see it. Gates live at member
+// presence (arms), never assignability.
+/**
+ * Type-level tag for a data-bound surface: shape `S` proven from data;
+ * `D` is the caller's data description.
+ */
+export interface Bound<S extends Shape, D = unknown> {
   readonly __shape?: S;
+  readonly __data?: D;
   value: Raw<S>;
 }
 

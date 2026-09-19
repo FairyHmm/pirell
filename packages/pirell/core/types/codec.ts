@@ -1,11 +1,4 @@
-import type {
-  Branch,
-  Dim,
-  Elem,
-  MixedTag,
-  Shape,
-  Variants,
-} from "./base.js";
+import type { Branch, Dim, Elem, MixedTag, Shape, Variants } from "./base.js";
 
 // Bidirectional Shape mapping, side by side: forwards (Shape → type)
 // first, backwards (type → Shape) second.
@@ -63,9 +56,8 @@ export type IsUnion<T, U = T> = T extends U
  * cast. Inverse of {@linkcode DataOf}: same ladder, opposite
  * direction.
  */
-export type ShapeOf<D> = ShapeOfElem<D> extends infer R extends Shape
-  ? R
-  : never;
+export type ShapeOf<D> =
+  ShapeOfElem<D> extends infer R extends Shape ? R : never;
 
 // Not unknown/any, not a union (those go mixed), not a container
 // (those recurse).
@@ -87,9 +79,9 @@ type ShapeOfElem<D> = D extends readonly (infer E)[]
     : IsConcreteLeaf<E> extends true
       ? [["i", E]]
       : ["i", ...ContainerTail<E>]
-  // Concrete-leaf before union: the common case skips IsUnion.
-  // Fixed heterogeneous leaf rows are tables, not mixed.
-  : D extends object
+  : // Concrete-leaf before union: the common case skips IsUnion.
+    // Fixed heterogeneous leaf rows are tables, not mixed.
+    D extends object
     ? IsConcreteLeaf<D[keyof D]> extends true
       ? [["k", D[keyof D]]]
       : D[keyof D] extends string | number | boolean
