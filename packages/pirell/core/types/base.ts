@@ -88,6 +88,15 @@ export interface Deferred<Out extends Shape> {
 /** A method table: names to registrable ops. */
 export type OpMap = Record<string, OpLike>;
 
+/**
+ * Marker for table-growing op results; the Fluent registration arm and
+ * applyOp branch on it structurally — no names, no registry.
+ */
+export const REGISTER = Symbol("pirellRegister");
+
+/** An op result that adds ops to the surface rather than new data. */
+export type Registration = { readonly [REGISTER]: true; ops: OpMap };
+
 /** Bound value read off the surface's shape (Deferred checked first — it satisfies Bound too). */
 export type CurrentData<S> =
   S extends Deferred<infer Out extends Shape>

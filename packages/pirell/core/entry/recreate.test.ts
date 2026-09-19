@@ -2,18 +2,11 @@ import { describe, it, expect, expectTypeOf } from "vitest";
 // Import ONLY from the public entry — the point is that a user can
 // recreate the library (define their own composable ops and assemble a
 // surface) using nothing but the exported API.
-import type { Op, BoundWith, Extended, ShapeOf } from "../index.js";
-import {
-  extend,
-  pirell,
-  buildBound,
-  buildDeferred,
-  compose,
-} from "../index.js";
+import type { Op, BoundWith, CoreOps, Extended, ShapeOf } from "../index.js";
+import { extend, pirell, compose } from "../index.js";
 
-// Bodies are factories returning data fns; the claim() narrows the
-// raw JSON each op receives to the caller's row shape (a user payload
-// bridge — the reusable part of every custom op body).
+// Bodies are factories returning data fns; rowsOf narrows the raw JSON
+// to the caller's row shape (the reusable part of custom op bodies).
 const rowsOf = (data: unknown): Record<string, unknown>[] =>
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- custom-op bodies reify caller JSON; the record-row claim is the op's private contract
   data as Record<string, unknown>[];
@@ -88,18 +81,11 @@ describe("recreating the library through the public API", () => {
   });
 });
 
-describe("recreating pirell() itself from buildBound/buildDeferred", () => {
-  // pipe/compose carry the `chain` brand here — surfaces route `.pipe`
-  // to the chain wiring, exactly as core's own ops map does it.
+describe("recreating pirell() itself through the public API", () => {
+  // No builders, no brands: seed pirell(), extend with a user table over
+  // CoreOps (the @pirell/ops contract). pipe/compose ride the generic arm.
   const myOps = { pipe: compose, compose };
-
-  function myPirell<T>(data: T): BoundWith<typeof myOps, ShapeOf<T>>;
-  function myPirell(): Extended<typeof myOps>;
-  function myPirell(...args: [unknown] | []): unknown {
-    return args.length === 0
-      ? buildDeferred([], myOps)
-      : buildBound(args[0], myOps);
-  }
+  const myPirell: Extended<CoreOps & typeof myOps> = pirell().extend(myOps);
 
   it("binds data and threads it through pipe, same as pirell()", () => {
     const result = myPirell([1, 2, 3]).pipe((ns: number[]) =>
@@ -109,16 +95,21 @@ describe("recreating pirell() itself from buildBound/buildDeferred", () => {
     expectTypeOf(result.value).not.toBeAny();
   });
 
-  it("a custom ops map is wired the same way core's is", () => {
-    const withSum = { ...myOps, sum };
-    function myPirellPlus<T>(data: T): BoundWith<typeof withSum, ShapeOf<T>>;
-    function myPirellPlus(): Extended<typeof withSum>;
-    function myPirellPlus(...args: [unknown] | []): unknown {
-      return args.length === 0
-        ? buildDeferred([], withSum)
-        : buildBound(args[0], withSum);
-    }
-    const total = myPirellPlus([{ amount: 1 }, { amount: 2 }]).sum("amount");
-    expect(total.value).toBe(3);
+  it("compose threads from bound and deferred surfaces", () => {
+    expect(
+      myPirell([1, 2, 3]).compose((ns: number[]) => ns.map((n) => n + 1)).value,
+    ).toEqual([2, 3, 4]);
+    expect(myPirell.compose((ns: number[]) => ns)([9]).value).toEqual([9]);
+  });
+
+  it("grows with later .extend() calls like any surface", () => {
+    const withSum = myPirell.extend({ sum });
+    expect(withSum([{ amount: 1 }, { amount: 2 }]).sum("amount").value).toBe(3);
+  });
+
+  it("user tables annotate with the public composition types", () => {
+    type StringCol = ShapeOf<string[]>;
+    const col: BoundWith<typeof myOps, StringCol> = myPirell(["a"]);
+    expectTypeOf(col.value).toEqualTypeOf<string[]>();
   });
 });

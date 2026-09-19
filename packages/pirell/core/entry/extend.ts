@@ -1,56 +1,24 @@
-import type { Deferred, OpMap, Shape } from "../types/base.js";
-import type {
-  Assembled,
-  ResolvedOpsDeferred,
-  SpecialOp,
-} from "../types/wrapper.js";
-import type { Registration } from "./surface.js";
-import { REGISTER, isSurface, valueOf } from "./surface.js";
+import type { Deferred, OpMap, Registration } from "../types/base.js";
+import type { GrownSurface } from "../types/wrapper.js";
+import { REGISTER } from "../types/base.js";
+import { isSurface, valueOf } from "./surface.js";
 import { buildBound, buildDeferred } from "./builders.js";
 
-// The op body behind every `.extend()`: REGISTER runtime tag plus the
-// `reg` type brand routing surface calls to the table-merge wiring.
-export const extendOp = Object.assign(
-  (ops: OpMap): ((_data: unknown) => Registration) =>
-    (_data: unknown) => ({ [REGISTER]: true, ops }),
-  { [REGISTER]: true },
-) as SpecialOp<"reg", (ops: OpMap) => (_data: unknown) => Registration>;
-
-// extend's registry entry beside its owner (compare `chain` in
-// compose.ts) — never from the types pile.
-declare global {
-  interface PirellSpecialWire<S, Ops extends OpMap> {
-    /** extend: merge an ops map into the surface's table. */
-    reg: <O2 extends OpMap>(ops: O2) => GrownSurface<S, O2 & Ops>;
-  }
-}
-
-/**
- * Table-grow landing: deferred rebuilds with the merged table (its
- * call signatures capture it); bound keeps itself via `& S`.
- */
-export type GrownSurface<S, Ops extends OpMap> =
-  S extends Deferred<infer Out extends Shape>
-    ? Assembled<ResolvedOpsDeferred<Out, Ops>, Ops> & {
-        (): GrownSurface<S, Ops>;
-      }
-    : Assembled<S, Ops>;
+// extend as a table entry: a plain factory growing the table through a
+// Registration. Marked so the deferred trap runs it immediately (it
+// ignores data), which is also how user-defined table-growers opt in.
+// Annotated plain: the runtime tag stays off the static type (it would
+// leak an unnameable symbol into inferred surfaces).
+export const extendOp: (ops: OpMap) => (_data: unknown) => Registration =
+  Object.assign(
+    (ops: OpMap): ((_data: unknown) => Registration) =>
+      (_data: unknown) => ({ [REGISTER]: true, ops }),
+    { [REGISTER]: true },
+  );
 
 /**
  * The common composition: ops wired onto a deferred surface. Annotate
  * published compositions as `Extended<typeof ops>`.
- *
- * ```ts
- * import { pirell } from "@pirell/core";
- * import type { Extended, Op } from "@pirell/core";
- *
- * const ops = {
- *   double: (): Op<[["i", number]], [["i", number]]> => (ns) =>
- *     ns.map((n) => n * 2),
- * };
- * const $: Extended<typeof ops> = pirell().extend(ops);
- * $([1, 2]).double().value; // [2, 4]
- * ```
  */
 export type Extended<Ops extends OpMap> = GrownSurface<Deferred<[]>, Ops> & {
   (): GrownSurface<Deferred<[]>, Ops>;
@@ -58,20 +26,7 @@ export type Extended<Ops extends OpMap> = GrownSurface<Deferred<[]>, Ops> & {
 
 /**
  * Wires new ops onto a surface. Accepts a data op, or a factory
- * yielding one once applied.
- *
- * ```ts
- * import { pirell } from "@pirell/core";
- * import type { Op } from "@pirell/core";
- *
- * const double = (): Op<[["i", number]], [["i", number]]> => (ns) =>
- *   ns.map((n) => n * 2);
- * const $ = pirell().extend({ double });
- * $([1, 2]).double().value; // [2, 4]
- * ```
- *
- * Result types come from {@linkcode GrownSurface} — annotate composed
- * surfaces as `Extended<typeof ops>`.
+ * yielding one once applied. Result types come from {@linkcode GrownSurface}.
  */
 export function extend<S, Ops extends OpMap>(
   surface: S,

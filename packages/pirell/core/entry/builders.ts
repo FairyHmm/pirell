@@ -1,10 +1,5 @@
-import {
-  REGISTER,
-  SURFACE,
-  isRegistration,
-  isSurface,
-  valueOf,
-} from "./surface.js";
+import { SURFACE, isRegistration, isSurface, valueOf } from "./surface.js";
+import { REGISTER } from "../types/base.js";
 import type { Bound, Deferred, OpLike } from "../types/base.js";
 import type { OpMap } from "../types/base.js";
 import type { Assembled } from "../types/wrapper.js";
@@ -52,11 +47,11 @@ const isArrayIndex = (prop: string): boolean => {
 
 // --- one universal loop ---
 
-// Proxy-based: a Registration can add methods mid-chain, so the table
-// isn't fixed at build time. Typo-safety lives entirely on Fluent's
-// compile-time coverage. No name is privileged — `ops: {}` yields zero
-// methods, `extend` included (the free `extend(surface, ops)` function
-// bootstraps a bare surface directly).
+// Proxy-based: extend rebuilds the surface through the ordinary table
+// path, so the table isn't fixed at build time. Typo-safety lives
+// entirely on Fluent's compile-time coverage. No name is privileged —
+// `ops: {}` yields zero methods; the free `extend(surface, ops)`
+// function bootstraps a bare surface directly.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Proxy erases the Bound/Deferred distinction; buildBound/buildDeferred re-type on return
 function buildSurface(ops: OpMap, spec: SurfaceSpec): any {
   const target: SurfaceSpec["invoke"] = spec.invoke;
@@ -131,9 +126,8 @@ export function buildDeferred(
         ops,
       ),
     getValue: () => undefined,
-    // A Registration must grow the table before data arrives; ops can't
-    // be speculatively run on fake data, so the REGISTER tag is checked
-    // on the op itself, without invoking it.
+    // A data-independent op (marked) grows the table before data
+    // arrives; other ops can't run speculatively, so they record a step.
     applyOp: (op, args) => {
       const result =
         typeof op === "function" && REGISTER in op

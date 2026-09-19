@@ -1,5 +1,9 @@
-// Per-op wiring (Fluent) and surface assembly (Assembled) are mutually
-// recursive — one unit. Dispatch is brand-first, then shape claims.
+// Surface types, one capability ladder mirrored by the trap: table ops
+// (grown via extend), natives (derived from data kind), reads
+// (keys/indices). Two structural arms cover surface operators without
+// naming any: Registration results grow the table, threading-shaped
+// factories thread like compose. Per-op wiring (Fluent) and assembly
+// (Assembled) recurse together — one unit.
 
 import type {
   Bound,
@@ -10,9 +14,11 @@ import type {
   OpLike,
   OpMap,
   Raw,
+  REGISTER,
   Shape,
 } from "./base.js";
 import type { DataOf, ShapeOf } from "./codec.js";
+import type { Tail, ThreadResult } from "./stages.js";
 import type { MatchShape } from "./match-shape.js";
 import type { NativeArms } from "./native.js";
 
@@ -44,52 +50,6 @@ type OutOf<RD> = [unknown] extends [RD]
       : never;
 
 /**
- * Open wiring registry for special ops, keyed by brand. Intentionally
- * empty — owners add entries to the global table below by declaration
- * merging (see entry/compose.ts), so deleting an op deletes its
- * plumbing.
- */
-// Registry home is a prefixed global name, not a module address:
-// global interfaces merge across files AND in flat dist output, so
-// entries reach downstream with no build step (module augmentation
-// would dangle once bundled).
-declare global {
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unused-vars -- open registry: intentionally empty; params bound by owners' entries
-  interface PirellSpecialWire<S, Ops extends OpMap> {
-    // no members — contributed by owners (see above).
-  }
-}
-
-/** Path-exported address for the open registry (see above). */
-export type SpecialWire<
-  S,
-  Ops extends OpMap = Record<never, never>,
-> = PirellSpecialWire<S, Ops>;
-
-/**
- * Marks an op as special: an optional phantom prop routing it to its
- * {@linkcode SpecialWire} entry. No runtime content.
- */
-export type SpecialOp<K extends string, F> = F & {
-  readonly __fluent?: K;
-};
-
-// Brand lookup: ordinary ops carry no brand (`unknown`) and resolve
-// without touching the registry at all; only a carried brand reaches
-// the lookup, so future brands stay open with no per-op cost today.
-// Never infer-match the op's own signatures (their generics can't take
-// the caller's S/Ops).
-type BrandOf<F, S, Ops extends OpMap> = F extends {
-  readonly __fluent?: infer K;
-}
-  ? [unknown] extends [K]
-    ? never
-    : K extends keyof SpecialWire<S, Ops>
-      ? SpecialWire<S, Ops>[K]
-      : never
-  : never;
-
-/**
  * A wired surface method: the op's claim checked against the surface
  * shape, siblings re-wired onto the output. Mismatches are uncallable (TS2349).
  */
@@ -97,19 +57,14 @@ export type Fluent<
   F extends OpLike,
   S,
   Ops extends OpMap = Record<never, never>,
-> =
-  // Branded special op: wiring comes from the open registry — one arm
-  // for every special op, present or future.
-  BrandOf<F, S, Ops> extends never
-    ? F extends (...args: infer A) => infer R
-      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any -- distinguishes 'factory returning a fn' from 'factory returning data'; only aliased ops arrive here and their param is set by the user, so the referent must be any
-        R extends (data: any) => any
-        ? // Ordinary factory: apply the args, then match its claim
-          // against the surface's shape.
-          FactoryPath<A, R, S, Ops>
-        : DirectOpPath<F, S, Ops>
-      : never
-    : BrandOf<F, S, Ops>;
+> = F extends (...args: infer A) => infer R
+  ? // eslint-disable-next-line @typescript-eslint/no-explicit-any -- distinguishes 'factory returning a fn' from 'factory returning data'; only aliased ops arrive here and their param is set by the user, so the referent must be any
+    R extends (data: any) => any
+    ? // Ordinary factory: apply the args, then match its claim
+      // against the surface's shape.
+      FactoryPath<A, R, S, Ops>
+    : DirectOpPath<F, S, Ops>
+  : never;
 
 // One call's landing: deferred rewires ungated; bound checks the claim,
 // fail-closed outside the arrow.
@@ -121,8 +76,63 @@ type Land<In extends Shape, S, Call> =
       ? Call
       : ShapeMismatch<In, CurrentShp<S>>;
 
-/** A fixed-arity factory: apply args, match the resulting claim against the surface shape. */
+/**
+ * A fixed-arity factory: Registration results grow the table; threading
+ * shapes thread; everything else matches its claim against the surface.
+ */
 type FactoryPath<A extends unknown[], R, S, Ops extends OpMap> =
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- matches any factory return to read RD; unknown's param would reject concrete stages by contravariance
+  R extends (data: any) => infer RD
+    ? RD extends { readonly [REGISTER]: true; ops: OpMap }
+      ? <O2 extends OpMap>(
+          ...args: GrowArgs<A, O2>
+        ) => GrownSurface<S, O2 & Ops>
+      : Threadable<A, R> extends true
+        ? ThreadPath<A, S, Ops>
+        : ClaimPath<A, R, S, Ops>
+    : never;
+
+// Table-grower args: the ops map binds at the call (like the old generic
+// wiring — reading it off the result would widen to OpMap); the rest
+// keeps the factory's own params.
+type GrowArgs<A extends unknown[], O2 extends OpMap> = A extends [
+  unknown,
+  ...infer Rest,
+]
+  ? [ops: O2, ...rest: Rest]
+  : [ops: O2];
+
+// Threading-shaped: every arg a function, stage takes unknown data.
+// Covers compose/pipe and user-defined threaders alike. The `unknown[]`
+// arm is real: generic factories infer their params unresolved.
+type Threadable<A, R> = R extends (data: infer D) => unknown
+  ? [unknown] extends [D]
+    ? // eslint-disable-next-line @typescript-eslint/no-explicit-any -- stage args are caller functions; unknown would reject typed params by contravariance
+      A extends Array<(arg: any) => unknown>
+      ? true
+      : unknown[] extends A
+        ? true
+        : false
+    : false
+  : false;
+
+// Generic threading: deferred appends; bound checks the first fn against
+// current data and re-wires siblings onto the composed result. `Fns`
+// binds at the call (like the old per-op wiring) — `A` only gates entry.
+type ThreadPath<A extends unknown[], S, Ops extends OpMap> =
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- matches any Deferred instantiation
+  S extends Deferred<any>
+    ? <Fns extends A>(...args: Fns) => Assembled<S, Ops>
+    : S extends Bound<Shape, unknown>
+      ? <Fns extends A>(
+          ...args: Fns & Tail<Fns, CurrentData<S>>
+        ) => Assembled<
+          Bound<ShapeOf<ThreadResult<Fns>>, ThreadResult<Fns>>,
+          Ops
+        >
+      : never;
+
+type ClaimPath<A extends unknown[], R, S, Ops extends OpMap> =
   R extends Op<infer FIn extends Shape, infer FOut extends Shape>
     ? Land<
         FIn,
@@ -145,14 +155,16 @@ type FactoryPath<A extends unknown[], R, S, Ops extends OpMap> =
 type DirectOpPath<F, S, Ops extends OpMap> =
   F extends Op<infer In extends Shape, infer Out extends Shape>
     ? Land<In, S, () => Assembled<OpResultSurface<S, Out, Ops, Raw<Out>>, Ops>>
-    : F extends (data: infer D2) => unknown
-      ? [ClaimOf<D2>] extends [never]
-        ? ShapeMismatch<never, CurrentShp<S>>
-        : Land<
-            ClaimOf<D2>,
-            S,
-            () => Assembled<OpResultSurface<S, [], Ops>, Ops>
-          >
+    : F extends (data: infer D2) => infer RD2
+      ? RD2 extends { readonly [REGISTER]: true; ops: OpMap }
+        ? <O2 extends OpMap>(ops: O2) => GrownSurface<S, O2 & Ops>
+        : [ClaimOf<D2>] extends [never]
+          ? ShapeMismatch<never, CurrentShp<S>>
+          : Land<
+              ClaimOf<D2>,
+              S,
+              () => Assembled<OpResultSurface<S, [], Ops>, Ops>
+            >
       : never;
 
 // Interfaces can't extend a mapped type (TS2312), so this stays an alias.
@@ -201,6 +213,14 @@ export type BoundWith<
   Out extends Shape,
   D = unknown,
 > = Assembled<Bound<Out, D>, Ops>;
+
+/** Table-grow landing: deferred rebuilds (signatures capture the table); bound keeps itself via `& S`. */
+export type GrownSurface<S, Ops extends OpMap> =
+  S extends Deferred<infer Out extends Shape>
+    ? Assembled<ResolvedOpsDeferred<Out, Ops>, Ops> & {
+        (): GrownSurface<S, Ops>;
+      }
+    : Assembled<S, Ops>;
 
 /** The decorated surface: its ops map wired as callable methods, plus the data (shape `S`). */
 export type Assembled<S, Ops extends OpMap = Record<never, never>> = OpMethods<

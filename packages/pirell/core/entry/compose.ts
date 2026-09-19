@@ -1,19 +1,10 @@
-import type { Bound, CurrentData, Deferred, OpMap } from "../types/base.js";
-import type { ShapeOf } from "../types/codec.js";
-import type {
-  ComposeChain,
-  ComposeResult,
-  FirstData,
-  Tail,
-} from "../types/chain.js";
-import type { Assembled, SpecialOp } from "../types/wrapper.js";
+import type { ComposeChain, ComposeResult, FirstData } from "../types/chain.js";
 import { makeFlat } from "../ops/ops.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- impl-stage call shape: must accept every fn an overload can hand over; unknown's param would reject concrete fns by contravariance
 type Stage = (x: any) => any;
 
-// Overloaded pipeline impl (unbranded) — the branded `compose` export
-// (plus its docs) sits below, after the body.
+// Overloaded pipeline impl — the `compose` export sits below, after the body.
 function composeImpl<Fns extends unknown[]>(
   ...fns: Fns & ComposeChain<Fns>
 ): (data: FirstData<Fns>) => ComposeResult<Fns>;
@@ -45,50 +36,11 @@ function composeImpl(...fns: Stage[]): (x: unknown) => unknown {
     }, x);
 }
 
-// Branded `"chain"`: surfaces route this to the chain wiring below
-// (type-only; the runtime value is just the impl).
 /**
  * Runs functions left to right, returning a reusable pipeline applied to
  * data later.
  */
-export const compose: SpecialOp<"chain", typeof composeImpl> = composeImpl;
-
-type ChainFns<S> = [
-  (arg: CurrentData<S>) => unknown,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- param must accept every fn shape; unknown would reject typed params by contravariance. Return already narrowed to unknown.
-  ...Array<(arg: any) => unknown>,
-];
-
-/** A chain op's surface method: bound re-binds to the composed result; deferred stays deferred. */
-export type ChainMethod<S, Ops extends OpMap = Record<never, never>> =
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- matches any Deferred instantiation
-  S extends Deferred<any>
-    ? {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- deferred chain must accept every fn shape; param any (see ChainFns)
-        <Fns extends Array<(arg: any) => unknown>>(
-          ...fns: Fns
-        ): Assembled<S, Ops>;
-      }
-    : // eslint-disable-next-line @typescript-eslint/no-explicit-any -- matches any Bound instantiation
-      S extends Bound<any>
-      ? {
-          <Fns extends ChainFns<S>>(
-            ...fns: Fns & Tail<Fns, CurrentData<S>>
-          ): Assembled<
-            Bound<ShapeOf<ComposeResult<Fns>>, ComposeResult<Fns>>,
-            Ops
-          >;
-        }
-      : never;
-
-// compose/pipe's entry on the global registry table: the function's
-// wiring paragraph, not a new module.
-declare global {
-  interface PirellSpecialWire<S, Ops extends OpMap> {
-    /** compose/pipe: thread fns, re-wiring siblings onto the result. */
-    chain: ChainMethod<S, Ops>;
-  }
-}
+export const compose = composeImpl;
 
 // Data-first view of {@linkcode compose}: same Chain/Result types,
 // flipped argument order. The entry claim is authored here, not in

@@ -8,6 +8,4 @@ export type {
   BoundWith,
   OpMethods,
   ResolvedOpsDeferred,
-  SpecialOp,
-  SpecialWire,
 } from "./wrapper.js";
